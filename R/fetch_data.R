@@ -70,6 +70,14 @@ fetch_query <- function(query) {
     password = rstudioapi::askForPassword("Database password")
   )
 
+  ## USE sql() for generic queries
+  ## TODO: see if there's a way to pass a dbplyr query. Maybe as a fn?
+  # if (is.character(query)) {
+  #   # use sql(query)
+  # } else {
+  # #query(con)
+  # }
+
   # apply specified query to con
   out <- NULL
 
