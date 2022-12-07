@@ -2,9 +2,12 @@
 % Please edit documentation in R/aaedb_connect.R
 \name{aaedb_connect}
 \alias{aaedb_connect}
+\alias{aaedb_disconnect}
 \title{Open a connection to the AAEDB}
 \usage{
 aaedb_connect(...)
+
+aaedb_disconnect(...)
 }
 \arguments{
 \item{\dots}{ignored}
@@ -18,11 +21,10 @@ aaedb_connect(...)
   An open connection will be automatically detected by the
   \code{fetch_table} and \code{fetch_query} functions.
 
-  It is good practice to close the database connection with
-  \code{dbDisconnect(con)} when all queries are completed. This
-  will happen automatically when the current R session ends. If
-  the connection needs to be closed prior to this, it can be
-  manually closed by running \code{dbDisconnect(DB_ENV$conn)}.
+  It is good practice to close the database connection when all queries
+  are completed. This will happen automatically when the current
+  R session ends. If the connection needs to be closed prior to this,
+  it can be manually closed by calling \code{aaedb_disconnect()}.
 }
 \examples{
 # connect to the AAEDB
@@ -33,6 +35,8 @@ query_fn <- function(x) {
   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) \%>\%
     filter(waterbody == "Ovens River")
 }
-site_info <- fetch_query(query_fn)
+ovens_sites <- fetch_query(query_fn)
 
+# manually disconnect from the AAEDB (not usually required)
+aaedb_disconnect()
 }

@@ -4,8 +4,9 @@
 #'
 #' @export
 #'
-#' @import RPostgres DBI
 #' @importFrom rstudioapi askForPassword
+#' @importFrom DBI dbConnect dbDisconnect dbIsValid
+#' @importFrom RPostgres Postgres
 #'
 #' @param \dots ignored
 #'
@@ -17,11 +18,10 @@
 #'   An open connection will be automatically detected by the
 #'   \code{fetch_table} and \code{fetch_query} functions.
 #'
-#'   It is good practice to close the database connection with
-#'   \code{dbDisconnect(con)} when all queries are completed. This
-#'   will happen automatically when the current R session ends. If
-#'   the connection needs to be closed prior to this, it can be
-#'   manually closed by running \code{dbDisconnect(DB_ENV$conn)}.
+#'   It is good practice to close the database connection when all queries
+#'   are completed. This will happen automatically when the current
+#'   R session ends. If the connection needs to be closed prior to this,
+#'   it can be manually closed by calling \code{aaedb_disconnect()}.
 #'
 #' @examples
 #' # connect to the AAEDB
@@ -32,8 +32,10 @@
 #'   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) %>%
 #'     filter(waterbody == "Ovens River")
 #' }
-#' site_info <- fetch_query(query_fn)
+#' ovens_sites <- fetch_query(query_fn)
 #'
+#' # manually disconnect from the AAEDB (not usually required)
+#' aaedb_disconnect()
 aaedb_connect <- function(...) {
 
   # taken from: https://www.r-bloggers.com/2022/03/closing-database-connections-in-r-packages/
@@ -72,6 +74,23 @@ aaedb_connect <- function(...) {
   # return TRUE if successful
   invisible(TRUE)
 
+}
+
+#' @title Close a connection to the AAEDB
+#'
+#' @export
+#'
+#' @rdname aaedb_connect
+aaedb_disconnect <- function(...) {
+  closeConnection(DB_ENV)
+}
+
+# internal function to check if a connection exists
+check_aaedb_connection <- function() {
+  valid <- !is.null(DB_ENV$conn)
+  if (valid)
+    valid <- DBI::dbIsValid(DB_ENV$conn)
+  valid
 }
 
 # set up a new environment for the database connection
