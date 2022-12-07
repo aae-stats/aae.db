@@ -4,9 +4,9 @@
 #'
 #' @export
 #'
-#' @import RPostgres DBI dplyr
-#' @importFrom dbplyr in_schema
 #' @importFrom rstudioapi askForPassword
+#' @importFrom dplyr tbl collect
+#' @importFrom dbplyr sql in_schema
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
@@ -36,8 +36,11 @@
 #'   is possible with the \code{aaedb_connect} function.
 #'
 #' @examples
+#' # connect to the AAEDB
+#' aaedb_connect()
+#'
 #' # download the VEFMAP database flat file
-#' vefmap_flat <- fetch_table("v_vefmap_only_flat_data")
+#' vefmap <- fetch_table("v_vefmap_only_flat_data")
 #'
 #' # process a simple SQL query to list all projects with data from the
 #' #   Ovens river
@@ -55,16 +58,19 @@
 #'   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) %>%
 #'     filter(waterbody == "Ovens River")
 #' }
-#' site_info <- fetch_query(query_fn)
+#' ovens_sites <- fetch_query(query_fn)
+#'
+#' # optional: disconnect from the AAEDB prior to ending the R session
+#' # aaedb_disconnect()
 #'
 #' @rdname fetch_data
 fetch_table <- function(x, schema = "aquatic_data", ...) {
 
   # connect to database if required (but disconnect on exit)
-  if (is.null(DB_ENV$conn)) {
+  if (!check_aaedb_connection()) {
 
     # make sure to disconnect from db on exit
-    on.exit(dbDisconnect(DB_ENV$conn))
+    on.exit(aaedb_disconnect())
 
     # connect to db
     aaedb_connect()
@@ -72,10 +78,10 @@ fetch_table <- function(x, schema = "aquatic_data", ...) {
   }
 
   # view flat file from specified schema
-  out <- tbl(DB_ENV$conn, in_schema(sql(schema), sql(x)))
+  out <- dplyr::tbl(DB_ENV$conn, dbplyr::in_schema(dbplyr::sql(schema), dbplyr::sql(x)))
 
   # and collect
-  out <- out %>% collect()
+  out <- dplyr::collect(out)
 
   # return
   out
@@ -83,6 +89,8 @@ fetch_table <- function(x, schema = "aquatic_data", ...) {
 }
 
 #' @rdname fetch_data
+#'
+#' @export
 #'
 fetch_query <- function(query, ...) {
 
@@ -104,10 +112,10 @@ fetch_query <- function(query, ...) {
   }
 
   # connect to database if required (but disconnect on exit)
-  if (is.null(DB_ENV$conn)) {
+  if (!check_aaedb_connection()) {
 
     # make sure to disconnect from db on exit
-    on.exit(dbDisconnect(DB_ENV$conn))
+    on.exit(aaedb_disconnect())
 
     # connect to db
     aaedb_connect()
@@ -117,13 +125,13 @@ fetch_query <- function(query, ...) {
   # grab query, assuming it's either a string SQL query or
   #   a function specifying a set of dbplyr actions
   if (is.character(query)) {
-    out <- tbl(DB_ENV$conn, sql(query))
+    out <- dplyr::tbl(DB_ENV$conn, dbplyr::sql(query))
   } else {
     out <- query(DB_ENV$conn)
   }
 
   # and collect
-  out <- out %>% collect()
+  out <- dplyr::collect(out)
 
   # return
   out

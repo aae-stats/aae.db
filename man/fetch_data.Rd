@@ -43,8 +43,11 @@ processes a dplyr-style series of operations}
   is possible with the \code{aaedb_connect} function.
 }
 \examples{
+# connect to the AAEDB
+aaedb_connect()
+
 # download the VEFMAP database flat file
-vefmap_flat <- fetch_table("v_vefmap_only_flat_data")
+vefmap <- fetch_table("v_vefmap_only_flat_data")
 
 # process a simple SQL query to list all projects with data from the
 #   Ovens river
@@ -62,6 +65,9 @@ query_fn <- function(x) {
   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) \%>\%
     filter(waterbody == "Ovens River")
 }
-site_info <- fetch_query(query_fn)
+ovens_sites <- fetch_query(query_fn)
+
+# optional: disconnect from the AAEDB prior to ending the R session
+# aaedb_disconnect()
 
 }
