@@ -6,44 +6,73 @@
 #'
 #' @import RPostgres DBI dplyr
 #' @importFrom dbplyr in_schema
+#' @importFrom rstudioapi askForPassword
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
 #'   \code{"aquatic_data"}
+#' @param query a character specifying a SQL query or a function
+#'   that takes a single argument (the database connection) and
+#'   processes a dplyr-style series of operations
+#' @param \dots ignored
 #'
 #' @description \code{fetch_table} and \code{fetch_query} represent two
 #'   ways to interact with the AAEDB. \code{fetch_table} provides access
-#'   to existing flat tables in the database, whereas \code{fetch_query}
+#'   to single tables in the database, whereas \code{fetch_query}
 #'   allows users to compute custom queries.
 #'
-#'   Both functions require credentials to access the AAEDB, plus appropriate
-#'   access and credentials to the relevant VPN.
+#'   Both functions require credentials to access the AAEDB, as well
+#'   as a appropriate VPN connection.
 #'
-#'   \code{fetch_query} is NOT CURRENTLY IMPLEMENTED.
+#'   In most cases, \code{fetch_table} can be used to download anything
+#'   you would download with \code{fetch_query}. However, \code{fetch_table}
+#'   will collect the full table each time it is processed, which will
+#'   then require post-processing on your local system. \code{fetch_query}
+#'   has not been extensively tested but provides an alternative and will
+#'   process data files on the server prior to downloading the final product.
+#'
+#'   If making multiple queries, it can be easier to connect once to the
+#'   AAEDB rather than repeatedly connecting (and disconnecting). This
+#'   is possible with the \code{aaedb_connect} function.
 #'
 #' @examples
-#' # to add
+#' # download the VEFMAP database flat file
+#' vefmap_flat <- fetch_table("v_vefmap_only_flat_data")
 #'
+#' # process a simple SQL query to list all projects with data from the
+#' #   Ovens river
+#' survey_info <- fetch_query(
+#'   "SELECT waterbody, id_project
+#'      FROM aquatic_data.site a LEFT JOIN aquatic_data.survey b
+#'      ON a.id_site = b.id_site
+#'      WHERE lower(waterbody) LIKE 'ovens%'
+#'      GROUP BY waterbody, id_project
+#'      ORDER by waterbody, id_project"
+#' )
 #'
-
+#' # process a dplyr query to collect site information
+#' query_fn <- function(x) {
+#'   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) %>%
+#'     filter(waterbody == "Ovens River")
+#' }
+#' site_info <- fetch_query(query_fn)
+#'
 #' @rdname fetch_data
-fetch_table <- function(x, schema = "aquatic_data") {
+fetch_table <- function(x, schema = "aquatic_data", ...) {
 
-  # make sure to disconnect from db on exit
-  on.exit(dbDisconnect(con))
+  # connect to database if required (but disconnect on exit)
+  if (is.null(DB_ENV$conn)) {
 
-  # connect to db
-  con <- dbConnect(
-    RPostgres::Postgres(),
-    dbname = "arispatialdb",
-    host = "ari-spatial-poc-db.cluster-custom-cepp1cnsvaah.ap-southeast-2.rds.amazonaws.com",
-    port = "5432",
-    user = rstudioapi::askForPassword("Database username"),
-    password = rstudioapi::askForPassword("Database password")
-  )
+    # make sure to disconnect from db on exit
+    on.exit(dbDisconnect(DB_ENV$conn))
+
+    # connect to db
+    aaedb_connect()
+
+  }
 
   # view flat file from specified schema
-  out <- tbl(con, in_schema(sql(schema), sql(x)))
+  out <- tbl(DB_ENV$conn, in_schema(sql(schema), sql(x)))
 
   # and collect
   out <- out %>% collect()
@@ -55,31 +84,46 @@ fetch_table <- function(x, schema = "aquatic_data") {
 
 #' @rdname fetch_data
 #'
-fetch_query <- function(query) {
+fetch_query <- function(query, ...) {
 
-  # make sure to disconnect from db on exit
-  on.exit(dbDisconnect(con))
+  # query must be a function or string
+  if (!is.character(query) & !is.function(query)) {
+    stop(
+      "query must be a SQL query (string) or function specifying ",
+      "a series of dplyr-stlye operations",
+      call. = FALSE
+    )
+  }
 
-  # connect to db
-  con <- dbConnect(
-    RPostgres::Postgres(),
-    dbname = "arispatialdb",
-    host = "ari-spatial-poc-db.cluster-custom-cepp1cnsvaah.ap-southeast-2.rds.amazonaws.com",
-    port = "5432",
-    user = rstudioapi::askForPassword("Database username"),
-    password = rstudioapi::askForPassword("Database password")
-  )
+  # check that the query isn't a vector if it's a string
+  if (is.character(query) & length(query) > 1) {
+    stop(
+      "SQL query has length > 1 but must be a single string",
+      .call = FALSE
+    )
+  }
 
-  ## USE sql() for generic queries
-  ## TODO: see if there's a way to pass a dbplyr query. Maybe as a fn?
-  # if (is.character(query)) {
-  #   # use sql(query)
-  # } else {
-  # #query(con)
-  # }
+  # connect to database if required (but disconnect on exit)
+  if (is.null(DB_ENV$conn)) {
 
-  # apply specified query to con
-  out <- NULL
+    # make sure to disconnect from db on exit
+    on.exit(dbDisconnect(DB_ENV$conn))
+
+    # connect to db
+    aaedb_connect()
+
+  }
+
+  # grab query, assuming it's either a string SQL query or
+  #   a function specifying a set of dbplyr actions
+  if (is.character(query)) {
+    out <- tbl(DB_ENV$conn, sql(query))
+  } else {
+    out <- query(DB_ENV$conn)
+  }
+
+  # and collect
+  out <- out %>% collect()
 
   # return
   out

@@ -6,29 +6,62 @@
 \alias{fetch_query}
 \title{Query the AAEDB}
 \usage{
-fetch_table(x, schema = "aquatic_data")
+fetch_table(x, schema = "aquatic_data", ...)
 
-fetch_query(query)
+fetch_query(query, ...)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
 
 \item{schema}{schema in which \code{x} is found. Defaults to
 \code{"aquatic_data"}}
+
+\item{\dots}{ignored}
+
+\item{query}{a character specifying a SQL query or a function
+that takes a single argument (the database connection) and
+processes a dplyr-style series of operations}
 }
 \description{
 \code{fetch_table} and \code{fetch_query} represent two
   ways to interact with the AAEDB. \code{fetch_table} provides access
-  to existing flat tables in the database, whereas \code{fetch_query}
+  to single tables in the database, whereas \code{fetch_query}
   allows users to compute custom queries.
 
-  Both functions require credentials to access the AAEDB, plus appropriate
-  access and credentials to the relevant VPN.
+  Both functions require credentials to access the AAEDB, as well
+  as a appropriate VPN connection.
 
-  \code{fetch_query} is NOT CURRENTLY IMPLEMENTED.
+  In most cases, \code{fetch_table} can be used to download anything
+  you would download with \code{fetch_query}. However, \code{fetch_table}
+  will collect the full table each time it is processed, which will
+  then require post-processing on your local system. \code{fetch_query}
+  has not been extensively tested but provides an alternative and will
+  process data files on the server prior to downloading the final product.
+
+  If making multiple queries, it can be easier to connect once to the
+  AAEDB rather than repeatedly connecting (and disconnecting). This
+  is possible with the \code{aaedb_connect} function.
 }
 \examples{
-# to add
+# download the VEFMAP database flat file
+vefmap_flat <- fetch_table("v_vefmap_only_flat_data")
 
+# process a simple SQL query to list all projects with data from the
+#   Ovens river
+survey_info <- fetch_query(
+  "SELECT waterbody, id_project
+     FROM aquatic_data.site a LEFT JOIN aquatic_data.survey b
+     ON a.id_site = b.id_site
+     WHERE lower(waterbody) LIKE 'ovens\%'
+     GROUP BY waterbody, id_project
+     ORDER by waterbody, id_project"
+)
+
+# process a dplyr query to collect site information
+query_fn <- function(x) {
+  tbl(x, in_schema(sql("aquatic_data"), sql("site"))) \%>\%
+    filter(waterbody == "Ovens River")
+}
+site_info <- fetch_query(query_fn)
 
 }
