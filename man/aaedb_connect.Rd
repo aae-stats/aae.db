@@ -42,6 +42,9 @@ aaedb_disconnect(...)
   it can be manually closed by calling \code{aaedb_disconnect()}.
 }
 \examples{
+# optional: store credentials to avoid re-entering every time
+aaedb_key_set()
+
 # connect to the AAEDB
 aaedb_connect()
 

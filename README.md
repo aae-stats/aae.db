@@ -18,6 +18,10 @@ The AAEDB uses a Microsoft Azure back-end, which requires a connection via the G
 # download a flat table of VEFMAP data (single download, prompts for credentials each time) 
 vefmap <- fetch_table("v_vefmap_only_flat_data")
 
+# optional: store credentials to avoid re-entering for every connection
+#   (will prompt for username and password)
+# aaedb_key_set()
+
 # connect once to the AAEDB and remain connected
 aaedb_connect()
 
@@ -47,5 +51,5 @@ ovens_sites <- fetch_query(query_fn)
 
 Please leave feedback, bug reports, or feature requests at the GitHub [issues page](https://github.com/aae-stats/aae.db/issues).
 
-Last updated: 7 December 2022
+Last updated: 19 January 2023 
 
