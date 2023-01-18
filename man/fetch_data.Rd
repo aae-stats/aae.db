@@ -4,11 +4,14 @@
 \alias{fetch_data}
 \alias{fetch_table}
 \alias{fetch_query}
+\alias{fetch_project}
 \title{Query the AAEDB}
 \usage{
 fetch_table(x, schema = "aquatic_data", ...)
 
 fetch_query(query, ...)
+
+fetch_project(project_id, range = c(1900, 2099), schema = "aquatic_data", ...)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
@@ -16,31 +19,46 @@ fetch_query(query, ...)
 \item{schema}{schema in which \code{x} is found. Defaults to
 \code{"aquatic_data"}}
 
-\item{\dots}{ignored}
+\item{\dots}{additional arguments passed to function-valued
+\code{query} arguments in \code{fetch_query} (ignored otherwise)}
 
 \item{query}{a character specifying a SQL query or a function
 that takes a single argument (the database connection) and
 processes a dplyr-style series of operations}
+
+\item{project_id}{an integer specifying an individual AAE project
+(1 - Snags, 2 - VEFMAP, 4 - NFRC, 6 - Kiewa Ovens, 7 - SRA,
+ 8 - Southern Basins, 9 - Ovens Demo Reaches, 10 - King Parrot
+ Creek Macquarie Perch, 11 - Lower Goulburn Projects, 12 - Hughes
+ Creek Macquarie Perch, 13 - Seven Creeks Macquarie Perch,
+ 14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
+ 16 - IVT Broken Creek)}
+
+\item{range}{a vector containing minimum and maximum years for
+which data are required}
 }
 \description{
-\code{fetch_table} and \code{fetch_query} represent two
-  ways to interact with the AAEDB. \code{fetch_table} provides access
-  to single tables in the database, whereas \code{fetch_query}
-  allows users to compute custom queries.
+\code{fetch_table}, \code{fetch_query}, and
+  \code{fetch_project} represent three ways to interact with the
+  AAEDB. \code{fetch_table} provides access to prepared tables in
+  the database, \code{fetch_query} allows users to compute custom
+  queries, and \code{fetch_project} prepares and downloads data
+  for an individual AAE project.
 
-  Both functions require credentials to access the AAEDB, as well
-  as a appropriate VPN connection.
+  All functions require credentials to access the AAEDB, as well
+  as a appropriate VPN connection. If making multiple queries,
+  it can be easier to connect once to the AAEDB rather than repeatedly
+  connecting (and disconnecting). This is possible with the
+  \code{aaedb_connect} function.
 
-  In most cases, \code{fetch_table} can be used to download anything
-  you would download with \code{fetch_query}. However, \code{fetch_table}
-  will collect the full table each time it is processed, which will
-  then require post-processing on your local system. \code{fetch_query}
-  has not been extensively tested but provides an alternative and will
-  process data files on the server prior to downloading the final product.
-
-  If making multiple queries, it can be easier to connect once to the
-  AAEDB rather than repeatedly connecting (and disconnecting). This
-  is possible with the \code{aaedb_connect} function.
+  \code{fetch_query} can be used to download anything
+  you would download with \code{fetch_table} or \code{fetch_project}.
+  The benefits of \code{fetch_table} and \code{fetch_project} are in
+  providing access to prepared tables containing commonly used variables
+  for analyses of fish data. The benefit of \code{fetch_query} is in
+  allowing custom queries and allowing processing of data files to occur
+  on the server prior to downloading the final data set. This may be
+  especially useful when working with large spatial data sets.
 }
 \examples{
 # connect to the AAEDB
@@ -66,6 +84,12 @@ query_fn <- function(x) {
     filter(waterbody == "Ovens River")
 }
 ovens_sites <- fetch_query(query_fn)
+
+# and grab information for individual sites
+ovens_data <- fetch_project(9)
+
+# possibly for a subset of years
+ovens_data <- fetch_project(9, range = c(2015, 2017))
 
 # optional: disconnect from the AAEDB prior to ending the R session
 # aaedb_disconnect()
