@@ -2,10 +2,16 @@
 % Please edit documentation in R/aaedb_connect.R
 \name{aaedb_connect}
 \alias{aaedb_connect}
+\alias{aaedb_key_set}
+\alias{aaedb_key_delete}
 \alias{aaedb_disconnect}
 \title{Open a connection to the AAEDB}
 \usage{
 aaedb_connect(...)
+
+aaedb_key_set()
+
+aaedb_key_delete()
 
 aaedb_disconnect(...)
 }
@@ -17,6 +23,15 @@ aaedb_disconnect(...)
   which can be useful when making repeated queries to the AAEDB as
   it avoids repeatedly entering user credentials. Connections to the
   AAEDB require an appropriate VPN connection.
+
+  \code{aaedb_connect} will ask for a username and password each time
+  it is called. To save this information locally, the
+  \code{aaedb_key_set} function allows a user to store their details
+  in the system credential store (e.g. keychain). On first call,
+  \code{aaedb_key_set} will ask for a username and password, after
+  which this information will be stored and will persist once the
+  R session is closed. The \code{aaedb_key_delete} function can be used
+  to remove this saved key.
 
   An open connection will be automatically detected by the
   \code{fetch_table} and \code{fetch_query} functions.
