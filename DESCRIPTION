@@ -1,7 +1,7 @@
 Package: aae.db
 Type: Package
 Title: Methods To Interact With The AAEDB 
-Version: 0.0.0.9001
+Version: 0.0.1
 Date: 2023-02-07
 Author: c(
   person(given = "Jian",
