@@ -51,5 +51,5 @@ ovens_sites <- fetch_query(query_fn)
 
 Please leave feedback, bug reports, or feature requests at the GitHub [issues page](https://github.com/aae-stats/aae.db/issues).
 
-Last updated: 19 January 2023 
+Last updated: 7 February 2023 
 
