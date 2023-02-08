@@ -1,5 +1,9 @@
 # aae.db (development version)
 
+## Fixes
+
+- Included rstudioapi as an explicit import
+
 # aae.db 0.0.1 
 
 ## Features
