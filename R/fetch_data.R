@@ -1,11 +1,12 @@
 #' @name fetch_data
 #'
-#' @title Query the AAEDB
+#' @title Query the AAEDB and return a query object to be manipulated
+#'   and downloaded
 #'
 #' @export
 #'
 #' @importFrom rstudioapi askForPassword
-#' @importFrom dplyr tbl collect mutate
+#' @importFrom dplyr tbl
 #' @importFrom dbplyr sql in_schema
 #'
 #' @param x a character specifying an individual table in the AAEDB
@@ -23,30 +24,38 @@
 #'    16 - IVT Broken Creek)
 #' @param range a vector containing minimum and maximum years for
 #'   which data are required
-#' @param \dots additional arguments passed to function-valued
-#'   \code{query} arguments in \code{fetch_query} (ignored otherwise)
+#' @param \dots additional arguments passed to \code{print};
+#'   ignored otherwise
+#'  @param n argument passed to \link[dplyr]{print} (defaults to NULL)
+#'  @param width argument passed to \link[dplyr]{print} (defaults to NULL)
+#'  @param n_extra argument passed to \link[dplyr]{print} (defaults to NULL)
 #'
 #' @description \code{fetch_table}, \code{fetch_query}, and
 #'   \code{fetch_project} represent three ways to interact with the
 #'   AAEDB. \code{fetch_table} provides access to prepared tables in
 #'   the database, \code{fetch_query} allows users to compute custom
-#'   queries, and \code{fetch_project} prepares and downloads data
-#'   for an individual AAE project.
+#'   queries, and \code{fetch_project} selects data for an
+#'   individual AAE project.
 #'
 #'   All functions require credentials to access the AAEDB, as well
 #'   as a appropriate VPN connection. If making multiple queries,
 #'   it can be easier to connect once to the AAEDB rather than repeatedly
 #'   connecting (and disconnecting). This is possible with the
-#'   \code{aaedb_connect} function.
+#'   \link[aae.db]{aaedb_connect} function.
 #'
 #'   \code{fetch_query} can be used to download anything
 #'   you would download with \code{fetch_table} or \code{fetch_project}.
 #'   The benefits of \code{fetch_table} and \code{fetch_project} are in
 #'   providing access to prepared tables containing commonly used variables
 #'   for analyses of fish data. The benefit of \code{fetch_query} is in
-#'   allowing custom queries and allowing processing of data files to occur
-#'   on the server prior to downloading the final data set. This may be
-#'   especially useful when working with large spatial data sets.
+#'   allowing custom queries. This may be especially useful when working
+#'   with large spatial data sets.
+#'
+#'   Update: the \code{fetch_} functions now return a database connection
+#'   rather than a downloaded table. This allows further filtering or
+#'   changes to the query using \code{dplyr} methods prior to downloading
+#'   the data. This is especially useful when downloading a subset of a
+#'   much larger data sets.
 #'
 #' @examples
 #' # connect to the AAEDB
@@ -54,6 +63,7 @@
 #'
 #' # download the VEFMAP database flat file
 #' vefmap <- fetch_table("v_vefmap_only_flat_data")
+#' vefmap <- vefmap %>% collect()
 #'
 #' # process a simple SQL query to list all projects with data from the
 #' #   Ovens river
@@ -65,19 +75,22 @@
 #'      GROUP BY waterbody, id_project
 #'      ORDER by waterbody, id_project"
 #' )
+#' survey_info <- survey_info %>% collect()
 #'
-#' # process a dplyr query to collect site information
-#' query_fn <- function(x) {
-#'   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) %>%
-#'     filter(waterbody == "Ovens River")
-#' }
-#' ovens_sites <- fetch_query(query_fn)
+#' # process a dplyr query to reduce the data set prior
+#' #   to downloading
+#' ovens_sites <- fetch_table("site")
+#' ovens_sites <- ovens_sites %>%
+#'   filter(waterbody == "Ovens River") %>%
+#'   collect()
 #'
 #' # and grab information for individual sites
 #' ovens_data <- fetch_project(9)
+#' ovens_data <- ovens_data %>% collect()
 #'
 #' # possibly for a subset of years
 #' ovens_data <- fetch_project(9, range = c(2015, 2017))
+#' ovens_data <- ovens_data %>% collect()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
 #' # aaedb_disconnect()
@@ -85,16 +98,9 @@
 #' @rdname fetch_data
 fetch_table <- function(x, schema = "aquatic_data", ...) {
 
-  # connect to database if required (but disconnect on exit)
-  if (!check_aaedb_connection()) {
-
-    # make sure to disconnect from db on exit
-    on.exit(aaedb_disconnect())
-
-    # connect to db
+  # connect to database if required
+  if (!check_aaedb_connection())
     aaedb_connect()
-
-  }
 
   # view flat file from specified schema
   out <- dplyr::tbl(
@@ -102,11 +108,8 @@ fetch_table <- function(x, schema = "aquatic_data", ...) {
     dbplyr::in_schema(dbplyr::sql(schema), dbplyr::sql(x))
   )
 
-  # and collect
-  out <- dplyr::collect(out)
-
   # return
-  out
+  as_aaedb_promise(out)
 
 }
 
@@ -117,46 +120,22 @@ fetch_table <- function(x, schema = "aquatic_data", ...) {
 fetch_query <- function(query, ...) {
 
   # query must be a function or string
-  if (!is.character(query) & !is.function(query)) {
-    stop(
-      "query must be a SQL query (string) or function specifying ",
-      "a series of dplyr-stlye operations",
-      call. = FALSE
-    )
-  }
+  if (!is.character(query))
+    stop("query must be a SQL query (string)", call. = FALSE)
 
-  # check that the query isn't a vector if it's a string
-  if (is.character(query) & length(query) > 1) {
-    stop(
-      "SQL query has length > 1 but must be a single string",
-      .call = FALSE
-    )
-  }
+  # check that the query isn't a vector
+  if (length(query) > 1)
+    stop("SQL query has length > 1 but must be a string", .call = FALSE)
 
-  # connect to database if required (but disconnect on exit)
-  if (!check_aaedb_connection()) {
-
-    # make sure to disconnect from db on exit
-    on.exit(aaedb_disconnect())
-
-    # connect to db
+  # connect to database if required
+  if (!check_aaedb_connection())
     aaedb_connect()
 
-  }
-
-  # grab query, assuming it's either a string SQL query or
-  #   a function specifying a set of dbplyr actions
-  if (is.character(query)) {
-    out <- dplyr::tbl(DB_ENV$conn, dbplyr::sql(query))
-  } else {
-    out <- query(DB_ENV$conn, ...)
-  }
-
-  # and collect
-  out <- dplyr::collect(out)
+  # grab query, assuming it's a string SQL query
+  out <- dplyr::tbl(DB_ENV$conn, dbplyr::sql(query))
 
   # return
-  out
+  as_aaedb_promise(out)
 
 }
 
@@ -184,16 +163,9 @@ fetch_project <- function(
     )
   }
 
-  # connect to database if required (but disconnect on exit)
-  if (!check_aaedb_connection()) {
-
-    # make sure to disconnect from db on exit
-    on.exit(aaedb_disconnect())
-
-    # connect to db
+  # connect to database if required
+  if (!check_aaedb_connection())
     aaedb_connect()
-
-  }
 
   # define the query for a given project and range
   query_string <- paste0(
@@ -206,15 +178,18 @@ fetch_project <- function(
     dbplyr::in_schema(dbplyr::sql(schema), dbplyr::sql(query_string))
   )
 
-  # and collect
-  out <- dplyr::collect(out)
+  # and return
+  as_aaedb_promise(out)
 
-  # add a project name column to the output
-  out <- mutate(out, source_project_name = aae.db:::source_project_name[project_id])
+}
 
-  # return
-  out
-
+#' @rdname fetch_data
+#'
+#' @export
+print.aaedb_promise <- function (
+    x, ..., n = NULL, width = NULL, n_extra = NULL
+) {
+  dbplyr:::print.tbl_sql(x, ..., n = NULL, width = NULL, n_extra = NULL)
 }
 
 # internal list of project names by id
