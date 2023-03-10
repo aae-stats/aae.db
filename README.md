@@ -10,7 +10,7 @@ The package is currently available on GitHub and can be installed with the `remo
 remotes::install_github("aae-stats/aae.db")
 ```
 
-The main functions to download data from the AAEDB are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, these functions assume data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. These functions return either full data sets (as tibbles) or unevaluated queries, which can be  manipulated prior to downloading the data.
+The main functions to download data from the AAEDB are `fetch_table`, which return tables by name from the AAEDB, `fetch_query`, which returns custom queries specified as an SQL string, and `fetch_project`, which returns data on individual AAE projects (see `?fetch_project` for a list of projects). By default, these functions assume data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. These functions return either full data sets (as tibbles) or unevaluated queries, which can be  manipulated prior to downloading the data.
 
 The AAEDB uses a Microsoft Azure back-end, which requires a connection via the GoConnect VPN as well as a username and password (RStudio will prompt for these). You will not be able to access the AAEDB if you do not have login credentials for GoConnect or the AAEDB.
 
