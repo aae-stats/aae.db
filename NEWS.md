@@ -1,5 +1,14 @@
 # aae.db (development version)
 
+# aae.db 0.0.1.9003
+
+## API changes
+
+- Remove promise class and reexport dplyr collect method directly
+- Set default to collect data within fetch_ functions but added note
+    that this default behaviour will reverse in the 0.1.0 release
+- Add reexports for collect function and pipe method
+
 # aae.db 0.0.1.9002
 
 ## API changes
