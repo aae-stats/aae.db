@@ -23,8 +23,9 @@
 #'   R session is closed. The \code{aaedb_key_delete} function can be used
 #'   to remove this saved key.
 #'
-#'   An open connection will be automatically detected by the
-#'   \code{fetch_table} and \code{fetch_query} functions.
+#'   An open connection will automatically be detected by the
+#'   \code{fetch_table}, \code{fetch_query}, and \code{fetch_project}
+#'   functions.
 #'
 #'   It is good practice to close the database connection when all queries
 #'   are completed. This will happen automatically when the current
@@ -38,12 +39,12 @@
 #' # connect to the AAEDB
 #' aaedb_connect()
 #'
-#' # process a basic query on the database
-#' query_fn <- function(x) {
-#'   tbl(x, in_schema(sql("aquatic_data"), sql("site"))) %>%
-#'     filter(waterbody == "Ovens River")
-#' }
-#' ovens_sites <- fetch_query(query_fn)
+#' # process a basic query on the database (list all site information
+#' #   for the Ovens River)
+#' site_table <- fetch_table("site", collect = FALSE)
+#' ovens_sites <- site_table %>%
+#'   filter(grepl("ovens", waterbody, ignore.case = TRUE)) %>%
+#'   collect()
 #'
 #' # manually disconnect from the AAEDB (not usually required)
 #' aaedb_disconnect()
@@ -100,7 +101,7 @@ aaedb_connect <- function(...) {
 #' @importFrom keyring key_set
 #'
 #' @rdname aaedb_connect
-aaedb_key_set <- function() {
+aaedb_key_set <- function(...) {
   uid <- rstudioapi::askForPassword("Database username")
   keyring::key_set(service = "aae_db", username = uid)
 }
@@ -112,7 +113,7 @@ aaedb_key_set <- function() {
 #' @importFrom keyring key_delete
 #'
 #' @rdname aaedb_connect
-aaedb_key_delete <- function() {
+aaedb_key_delete <- function(...) {
   uid <- rstudioapi::askForPassword("Database username")
   keyring::key_delete(service = "aae_db", username = uid)
 }
@@ -161,7 +162,7 @@ get_credentials <- function(method, type) {
 }
 
 # internal function to check if a connection exists
-check_aaedb_connection <- function() {
+check_aaedb_connection <- function(...) {
   valid <- !is.null(DB_ENV$conn)
   if (valid)
     valid <- DBI::dbIsValid(DB_ENV$conn)
