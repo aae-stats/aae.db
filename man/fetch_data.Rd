@@ -5,13 +5,20 @@
 \alias{fetch_table}
 \alias{fetch_query}
 \alias{fetch_project}
-\title{Query the AAEDB}
+\title{Query the AAEDB and return a query object to be manipulated
+  and downloaded}
 \usage{
-fetch_table(x, schema = "aquatic_data", ...)
+fetch_table(x, schema = "aquatic_data", collect = TRUE, ...)
 
-fetch_query(query, ...)
+fetch_query(query, collect = TRUE, ...)
 
-fetch_project(project_id, range = c(1900, 2099), schema = "aquatic_data", ...)
+fetch_project(
+  project_id,
+  range = c(1900, 2099),
+  schema = "aquatic_data",
+  collect = TRUE,
+  ...
+)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
@@ -19,12 +26,13 @@ fetch_project(project_id, range = c(1900, 2099), schema = "aquatic_data", ...)
 \item{schema}{schema in which \code{x} is found. Defaults to
 \code{"aquatic_data"}}
 
-\item{\dots}{additional arguments passed to function-valued
-\code{query} arguments in \code{fetch_query} (ignored otherwise)}
+\item{collect}{logical: should a query be executed and the full
+data set returned (default, \code{TRUE}) or should the query
+be returned for further processing prior to execution? See description}
 
-\item{query}{a character specifying a SQL query or a function
-that takes a single argument (the database connection) and
-processes a dplyr-style series of operations}
+\item{\dots}{additional arguments passed to \link[dbplyr]{tbl_sql}}
+
+\item{query}{a character specifying a SQL query}
 
 \item{project_id}{an integer specifying an individual AAE project
 (1 - Snags, 2 - VEFMAP, 4 - NFRC, 6 - Kiewa Ovens, 7 - SRA,
@@ -42,30 +50,50 @@ which data are required}
   \code{fetch_project} represent three ways to interact with the
   AAEDB. \code{fetch_table} provides access to prepared tables in
   the database, \code{fetch_query} allows users to compute custom
-  queries, and \code{fetch_project} prepares and downloads data
-  for an individual AAE project.
+  queries, and \code{fetch_project} selects data for an
+  individual AAE project.
 
   All functions require credentials to access the AAEDB, as well
   as a appropriate VPN connection. If making multiple queries,
   it can be easier to connect once to the AAEDB rather than repeatedly
   connecting (and disconnecting). This is possible with the
-  \code{aaedb_connect} function.
+  \link[aae.db]{aaedb_connect} function.
 
   \code{fetch_query} can be used to download anything
   you would download with \code{fetch_table} or \code{fetch_project}.
   The benefits of \code{fetch_table} and \code{fetch_project} are in
   providing access to prepared tables containing commonly used variables
   for analyses of fish data. The benefit of \code{fetch_query} is in
-  allowing custom queries and allowing processing of data files to occur
-  on the server prior to downloading the final data set. This may be
-  especially useful when working with large spatial data sets.
+  allowing custom queries. This may be especially useful when working
+  with large spatial data sets.
+
+  Update: the \code{fetch_} functions now return an unevaluated query
+  rather than a full data table. This allows further filtering or
+  changes to the query using \code{dplyr} methods prior to downloading
+  the data. This is especially useful when downloading a subset of a
+  much larger data sets. All three methods will remain available in
+  future versions but may be renamed to better reflect their intended
+  use.
 }
 \examples{
 # connect to the AAEDB
 aaedb_connect()
 
-# download the VEFMAP database flat file
-vefmap <- fetch_table("v_vefmap_only_flat_data")
+# dplyr methods used below
+library(dplyr)
+
+# set up a query that includes the full flat VEFMAP data set
+vefmap <- fetch_table("v_vefmap_only_flat_data", collect = FALSE)
+
+# can manipulate and filter this query with dplyr methods
+vefmap <- vefmap \%>\%
+  filter(
+    waterbody == "Campaspe River",
+    scientific_name == "Maccullochella peelii"
+  )
+
+# evaluate this query with collect
+vefmap <- vefmap \%>\% collect()
 
 # process a simple SQL query to list all projects with data from the
 #   Ovens river
@@ -75,23 +103,34 @@ survey_info <- fetch_query(
      ON a.id_site = b.id_site
      WHERE lower(waterbody) LIKE 'ovens\%'
      GROUP BY waterbody, id_project
-     ORDER by waterbody, id_project"
+     ORDER by waterbody, id_project",
+  collect = FALSE
 )
+survey_info <- survey_info \%>\% collect()
 
-# process a dplyr query to collect site information
-query_fn <- function(x) {
-  tbl(x, in_schema(sql("aquatic_data"), sql("site"))) \%>\%
-    filter(waterbody == "Ovens River")
-}
-ovens_sites <- fetch_query(query_fn)
+# process this same query using dplyr methods
+site_data <- fetch_table("site", collect = FALSE)
+survey_data <- fetch_table("survey", collect = FALSE)
+survey_info_dplyr <- site_data \%>\%
+  left_join(
+    survey_data \%>\% distinct(id_site, id_project),
+    by = "id_site"
+  ) \%>\%
+  filter(grepl("ovens", waterbody, ignore.case = TRUE)) \%>\%
+  distinct(waterbody, id_project) \%>\%
+  arrange(waterbody, id_project) \%>\%
+  collect()
 
-# and grab information for individual sites
-ovens_data <- fetch_project(9)
+# and grab information for individual projects
+ovens_data <- fetch_project(9, collect = FALSE)
+ovens_data <- ovens_data \%>\% collect()
 
-# possibly for a subset of years
-ovens_data <- fetch_project(9, range = c(2015, 2017))
+# repeat this for a subset of years
+ovens_data <- fetch_project(9, range = c(2015, 2017), collect = FALSE)
+ovens_data <- ovens_data \%>\% collect()
 
 # optional: disconnect from the AAEDB prior to ending the R session
+#   when all queries and evaluation is complete
 # aaedb_disconnect()
 
 }
