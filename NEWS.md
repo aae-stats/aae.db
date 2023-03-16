@@ -1,5 +1,21 @@
 # aae.db (development version)
 
+# aae.db 0.1.0.9000
+
+## Features
+
+- Add methods to extract site or species information either for all
+    species in database or for a filtered subset: `fetch_site_info` and
+    `fetch_species_info`
+- Update `fetch_project` to optionally return multiple projects in a
+    single flat table
+
+## API changes
+
+- Change default to lazy evaluation of queries (collect = FALSE)
+- Update `fetch_project` function to use R-side manipulation of
+    queries for greater flexibility
+
 # aae.db 0.0.1.9003
 
 ## API changes
