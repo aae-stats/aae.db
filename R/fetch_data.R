@@ -6,10 +6,10 @@
 #' @export
 #'
 #' @importFrom rstudioapi askForPassword
-#' @importFrom methods hasArgs
-#' @importFrom all_of arrange dplyr filter inner_join left_join mutate
+#' @importFrom dplyr all_of arrange filter inner_join left_join mutate
 #'   rename select tbl
 #' @importFrom dbplyr sql in_schema
+#' @importFrom rlang `!!`
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
