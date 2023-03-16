@@ -169,5 +169,39 @@ check_aaedb_connection <- function(...) {
   valid
 }
 
+# internal function to connect to the DB if not already connected
+connect_if_required <- function(.call, collect) {
+
+  # default to using open connection
+  new_connection <- FALSE
+
+  # check connection and open a new connection if required
+  if (!check_aaedb_connection()) {
+
+    # connect to aaedb
+    aaedb_connect()
+
+    # print a note that a database connection is open if
+    #   not collecting
+    if (!collect) {
+      cat(
+        .call,
+        "has opened a connection to the AAEDB.",
+        "This connection must remain open while working with",
+        "the returned query but can be closed with aaedb_disconnect()",
+        "once the query has been executed."
+      )
+    }
+
+    # update flag to note new connection
+    new_connection <- TRUE
+
+  }
+
+  # return
+  new_connection
+
+}
+
 # set up a new environment for the database connection
 DB_ENV <- new.env()
