@@ -1,6 +1,7 @@
 ## `aae.db`: methods to query the AAEDB
 
-The `aae.db` package is a suite of methods to query and download data from the AAEDB. The current version of this package supports direct downloads of tables from the AAEDB as well as queries on the AAEDB with lazy evaluation.
+The `aae.db` package is a suite of methods to query and download data from the AAEDB. The current version of this package supports direct downloads of tables from the AAEDB as well as customised queries, either using dplyr methods or SQL. Lazy evaluation is the default for all queries, which means pre-processing of queries occurs on the AAEDB rather than locally.
+
 
 ## Usage
 
@@ -10,7 +11,9 @@ The package is currently available on GitHub and can be installed with the `remo
 remotes::install_github("aae-stats/aae.db")
 ```
 
-The main functions to download data from the AAEDB are `fetch_table`, which return tables by name from the AAEDB, `fetch_query`, which returns custom queries specified as an SQL string, and `fetch_project`, which returns data on individual AAE projects (see `?fetch_project` for a list of projects). By default, these functions assume data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. These functions return either full data sets (as tibbles) or unevaluated queries, which can be  manipulated prior to downloading the data.
+The main function to download data from the AAEDB is `fetch_project`, which is recommended for most applications. The `fetch_project` function returns data for specific projects (see `?fetch_data` for a list of projects), and can return data for multiple projects simultaneously.
+
+Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified.
 
 There are several helper functions to extract information on sites or species. This information can be filtered based on the sites or species in a downloaded data table, or with regex expressions. See `?fetch_data` for examples.
 
@@ -46,6 +49,23 @@ vefmap_lazy <- vefmap_lazy %>%
 # download this data set
 vefmap_lazy <- vefmap_lazy %>% collect()
 
+# fetch information on the sites in a data set
+vefmap_site_info <- fetch_site_info(vefmap_lazy)
+
+# "spatialise" this information (requires the `sf` package)
+library(sf)
+vefmap_site_info <- vefmap_site_info %>%
+  filter(!is.na(geom_pnt)) %>%
+  collect()
+vefmap_sf <- vefmap_site_info %>%
+  st_set_geometry(st_as_sfc(vemfap_site_info$geom_pnt))
+  
+# and make a basic plot of this with the `mapview` package
+library(mapview)
+vefmap_sf %>%
+  select(-geom_pnt) %>%
+  mapview(col.regions = "DarkGreen", label = "site_name", layer.name = "Survey site")
+    
 # prepare a simple SQL query to list all projects with data from the
 #   Ovens river
 survey_info <- fetch_query(
@@ -77,5 +97,5 @@ ovens_sites <- site_table %>%
 
 Please leave feedback, bug reports, or feature requests at the GitHub [issues page](https://github.com/aae-stats/aae.db/issues).
 
-Last updated: 10 March 2023 
+Last updated: 16 March 2023 
 
