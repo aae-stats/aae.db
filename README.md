@@ -34,11 +34,12 @@ vefmap <- fetch_project(2)
 
 # or query the VEFMAP and NFRC projects simultaneously
 vefmap_nfrc <- fetch_project(c(2, 4))
+```
 
-# queries can be manipulated prior to downloading the data, for
-#   example, using dplyr methods to filter to Murray cod observations in
-#   waterbodies containing the term "campaspe" (not case-sensitive) and
-#   select a subset of columns
+
+Queries can be manipulated prior to downloading the data, for example, using dplyr methods to filter to Murray cod observations in waterbodies containing the term "campaspe" (not case-sensitive) and select a subset of columns. More complex operations are possible, such as forming joins or unions of multiple queries.
+
+```
 library(dplyr)
 vefmap <- vefmap %>%
   filter(
@@ -67,8 +68,13 @@ species_info <- fetch_species_info(vefmap)
 
 # fetch information on the sites in any waterbody containing "Goulburn" 
 goulburn_site_info <- fetch_site_info(pattern = "Goulburn")
+```
 
-# "spatialise" the VEFMAP site information (requires the `sf` package)
+
+With the tools in the `sf` package, the site information can be "spatialised" for use in mapping or analyses that require spatial locations.
+
+```
+# "spatialise" the VEFMAP site information
 library(sf)
 vefmap_site_info <- vefmap_site_info %>%
   filter(!is.na(geom_pnt)) %>%
@@ -76,7 +82,7 @@ vefmap_site_info <- vefmap_site_info %>%
 vefmap_sf <- vefmap_site_info %>%
   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
   
-# and make a basic plot of this with the `mapview` package
+# make a basic map with the `mapview` package
 library(mapview)
 vefmap_sf %>%
   select(-geom_pnt) %>%
