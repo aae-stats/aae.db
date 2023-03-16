@@ -122,7 +122,7 @@ vefmap_site_info <- vefmap_site_info \%>\%
   filter(!is.na(geom_pnt)) \%>\%
   collect()
 vefmap_sf <- vefmap_site_info \%>\%
-  st_set_geometry(st_as_sfc(vemfap_site_info$geom_pnt))
+  st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
 
 # or for all sites (optionally matching a regex expression)
 murray_site_info <- fetch_site_info(pattern = "^Murray")
@@ -140,8 +140,12 @@ fetch_table("taxon_lu", collect = FALSE) \%>\%
   pull(taxon_type) \%>\%
   unique()
 
-# and download data for one group
-fetch_species_info(taxon = "Aquatic invertebrates")
+# and download data for one group (setting primary_discipline to NULL
+#   to override default setting)
+fetch_species_info(
+  taxon = "Aquatic invertebrates",
+  primary_discipline = NULL
+)
 
 # process a simple SQL query to list all projects with data from the
 #   Ovens river
@@ -173,9 +177,11 @@ survey_info_dplyr <- site_data \%>\%
 ovens_data <- fetch_project(9)
 ovens_data <- ovens_data \%>\% collect()
 
-# repeat this for a subset of years
-ovens_data <- fetch_project(9, start = 2015, end = 2017)
-ovens_data <- ovens_data \%>\% collect()
+# subset this to 2015-2017 surveys
+ovens_data <- fetch_project(9)
+ovens_data <- ovens_data \%>\%
+  filter(survey_year \%in\% c(2015:2017)) \%>\%
+  collect()
 
 # optional: disconnect from the AAEDB prior to ending the R session
 #   when all queries and evaluation is complete

@@ -7,7 +7,7 @@
 #'
 #' @importFrom rstudioapi askForPassword
 #' @importFrom dplyr all_of arrange filter inner_join left_join mutate
-#'   rename select tbl
+#'   rename select tbl union_all
 #' @importFrom dbplyr sql in_schema
 #' @importFrom rlang `!!`
 #'
@@ -98,7 +98,7 @@
 #'   filter(!is.na(geom_pnt)) %>%
 #'   collect()
 #' vefmap_sf <- vefmap_site_info %>%
-#'   st_set_geometry(st_as_sfc(vemfap_site_info$geom_pnt))
+#'   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
 #'
 #' # or for all sites (optionally matching a regex expression)
 #' murray_site_info <- fetch_site_info(pattern = "^Murray")
@@ -116,8 +116,12 @@
 #'   pull(taxon_type) %>%
 #'   unique()
 #'
-#' # and download data for one group
-#' fetch_species_info(taxon = "Aquatic invertebrates")
+#' # and download data for one group (setting primary_discipline to NULL
+#' #   to override default setting)
+#' fetch_species_info(
+#'   taxon = "Aquatic invertebrates",
+#'   primary_discipline = NULL
+#' )
 #'
 #' # process a simple SQL query to list all projects with data from the
 #' #   Ovens river
@@ -149,9 +153,11 @@
 #' ovens_data <- fetch_project(9)
 #' ovens_data <- ovens_data %>% collect()
 #'
-#' # repeat this for a subset of years
-#' ovens_data <- fetch_project(9, start = 2015, end = 2017)
-#' ovens_data <- ovens_data %>% collect()
+#' # subset this to 2015-2017 surveys
+#' ovens_data <- fetch_project(9)
+#' ovens_data <- ovens_data %>%
+#'   filter(survey_year %in% c(2015:2017)) %>%
+#'   collect()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
 #' #   when all queries and evaluation is complete
@@ -223,9 +229,10 @@ fetch_query <- function(query, collect = FALSE, ...) {
 fetch_project <- function(project_id, collect = FALSE, ...) {
 
   # query must be a function or string
-  if (!project_id %in% c(1, 2, 4, 6:16)) {
+  if (!all((project_id %% 1) == 0)) {
     stop(
-      "project_id must be a valid integer (see ?fetch_project for details)",
+      "project_id must be an integer or vector of ",
+      "integers (see ?fetch_project for details)",
       call. = FALSE
     )
   }
@@ -239,14 +246,14 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
 
   # grab survey event table
   survey_event <- fetch_survey_event(project_id) %>%
-    add_electro(survey_event) %>%
-    add_netting(survey_event)
+    add_electro() %>%
+    add_netting()
 
   # grab info on collected and observed taxa
   taxon_lu <- fetch_taxon_lu()
   taxa_collected <- fetch_collected(survey_event, taxon_lu)
-  taxa_observed <- fetch_observed(survey_event, taxon_lu)
-  taxa_all <- taxa_collected %>% union_all(taxa_observed)
+  taxa_observed <- fetch_observed(survey_event, taxon_lu, taxa_collected)
+  taxa_all <- taxa_collected %>% dplyr::union_all(taxa_observed)
 
   # combine everything into a single table
   out <- survey_event %>%
@@ -404,7 +411,6 @@ fetch_species_info <- function(
 
 }
 
-
 # internal function to fetch survey event info
 fetch_survey_event <- function(project_id) {
 
@@ -508,7 +514,7 @@ fetch_collected <- function(survey_event, taxon_lu) {
 }
 
 # internal function to fetch info on observed taxa
-fetch_observed <- function(survey_event, taxon_lu) {
+fetch_observed <- function(survey_event, taxon_lu, taxa_collected) {
 
   # grab observation table from aaedb and add empty fields
   #   for compatibility with collected table
