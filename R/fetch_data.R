@@ -6,8 +6,10 @@
 #' @export
 #'
 #' @importFrom rstudioapi askForPassword
-#' @importFrom dplyr tbl
+#' @importFrom dplyr all_of arrange filter inner_join left_join mutate
+#'   rename select tbl union_all
 #' @importFrom dbplyr sql in_schema
+#' @importFrom rlang `!!`
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
@@ -20,12 +22,23 @@
 #'    Creek Macquarie Perch, 13 - Seven Creeks Macquarie Perch,
 #'    14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
 #'    16 - IVT Broken Creek)
-#' @param range a vector containing minimum and maximum years for
-#'   which data are required
-#'@param collect logical: should a query be executed and the full
-#'   data set returned (default, \code{TRUE}) or should the query
-#'   be returned for further processing prior to execution? See description
-#' @param \dots additional arguments passed to \link[dbplyr]{tbl_sql}
+#' @param collect logical: should a query be executed (\code{TRUE}) or
+#'   evaluated lazily (\code{FALSE}, the default)
+#' @param x a collected query (table), used to filter waterbodies, sites
+#'   and projects in \code{fetch_site_info} or species scientific and
+#'   common names in \code{fetch_species_info}
+#' @param pattern a regex pattern used to filter waterbodies in
+#'   \code{fetch_site_info} or scientific names in \code{fetch_species_info}
+#' @param taxon taxonomic group for which data are requested in
+#'   \code{fetch_species_info}. Defaults to "Fish". See examples to extract
+#'   a list of all possible taxonomic groups
+#' @param primary_discipline discipline for which data are requested in
+#'   \code{fetch_species_info}. Defaults to "Aquatic fauna" but can take
+#'   values of "Aquatic fauna", "Flora", "Aquatic invertebrates",
+#'   "Terrestrial fauna", and "Marine"
+#' @param \dots additional arguments passed to \link[dbplyr]{tbl_sql} for
+#'   \code{fetch_table} and \code{fetch_query} (ignored in
+#'   \code{fetch_project})
 #'
 #' @description \code{fetch_table}, \code{fetch_query}, and
 #'   \code{fetch_project} represent three ways to interact with the
@@ -64,7 +77,7 @@
 #' library(dplyr)
 #'
 #' # set up a query that includes the full flat VEFMAP data set
-#' vefmap <- fetch_table("v_vefmap_only_flat_data", collect = FALSE)
+#' vefmap <- fetch_table("v_vefmap_only_flat_data")
 #'
 #' # can manipulate and filter this query with dplyr methods
 #' vefmap <- vefmap %>%
@@ -75,6 +88,40 @@
 #'
 #' # evaluate this query with collect
 #' vefmap <- vefmap %>% collect()
+#'
+#' # fetch information on the sites in a data set
+#' vefmap_site_info <- fetch_site_info(vefmap)
+#'
+#' # "spatialise" this information
+#' library(sf)
+#' vefmap_site_info <- vefmap_site_info %>%
+#'   filter(!is.na(geom_pnt)) %>%
+#'   collect()
+#' vefmap_sf <- vefmap_site_info %>%
+#'   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
+#'
+#' # or for all sites (optionally matching a regex expression)
+#' murray_site_info <- fetch_site_info(pattern = "^Murray")
+#'
+#' # extract information on the species in a data set
+#' fetch_species_info(vefmap)
+#'
+#' # or for all species with scientific names matching a pattern
+#' fetch_species_info(pattern = "Maccull")
+#'
+#' # list all taxonomic groups for use in fetch_species_info
+#' fetch_table("taxon_lu", collect = FALSE) %>%
+#'   select(taxon_type) %>%
+#'   collect() %>%
+#'   pull(taxon_type) %>%
+#'   unique()
+#'
+#' # and download data for one group (setting primary_discipline to NULL
+#' #   to override default setting)
+#' fetch_species_info(
+#'   taxon = "Aquatic invertebrates",
+#'   primary_discipline = NULL
+#' )
 #'
 #' # process a simple SQL query to list all projects with data from the
 #' #   Ovens river
@@ -90,8 +137,8 @@
 #' survey_info <- survey_info %>% collect()
 #'
 #' # process this same query using dplyr methods
-#' site_data <- fetch_table("site", collect = FALSE)
-#' survey_data <- fetch_table("survey", collect = FALSE)
+#' site_data <- fetch_table("site")
+#' survey_data <- fetch_table("survey")
 #' survey_info_dplyr <- site_data %>%
 #'   left_join(
 #'     survey_data %>% distinct(id_site, id_project),
@@ -103,54 +150,28 @@
 #'   collect()
 #'
 #' # and grab information for individual projects
-#' ovens_data <- fetch_project(9, collect = FALSE)
+#' ovens_data <- fetch_project(9)
 #' ovens_data <- ovens_data %>% collect()
 #'
-#' # repeat this for a subset of years
-#' ovens_data <- fetch_project(9, range = c(2015, 2017), collect = FALSE)
-#' ovens_data <- ovens_data %>% collect()
+#' # subset this to 2015-2017 surveys
+#' ovens_data <- fetch_project(9)
+#' ovens_data <- ovens_data %>%
+#'   filter(survey_year %in% c(2015:2017)) %>%
+#'   collect()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
 #' #   when all queries and evaluation is complete
 #' # aaedb_disconnect()
 #'
 #' @rdname fetch_data
-fetch_table <- function(x, schema = "aquatic_data", collect = TRUE, ...) {
+fetch_table <- function(x, schema = "aquatic_data", collect = FALSE, ...) {
 
   # connect to database if required
-  if (!check_aaedb_connection()) {
+  new_connection <- connect_if_required("fetch_table", collect = collect)
 
-    # and kick this connection if the query is executed
-    if (collect)
-      on.exit(aaedb_disconnect())
-
-    # connect to aaedb
-    aaedb_connect()
-
-    # print a note that a database connection is open if
-    #   not collecting
-    if (!collect) {
-      cat(
-        "fetch_table has opened a connection to the AAEDB. ",
-        "This connection must remain open while working with ",
-        "the returned query but can be closed with aaedb_disconnect() ",
-        "once the query has been executed."
-      )
-    }
-
-  }
-
-  # print a note that automatic execution of the query will stop in
-  #   the next version
-  if (collect) {
-    cat(
-      "collect is TRUE (the default), which means the query will be executed",
-      "and the full data set returned. This default setting will reverse",
-      "in version 0.1.0 of the aae.db package and returned queries will need",
-      "to be executed with the collect() function. To return unevaluated",
-      "queries in the current version of aaa.db, set collect = FALSE."
-    )
-  }
+  # and kick this connection on exit if it's new and the query is executed
+  if (collect & new_connection)
+    on.exit(aaedb_disconnect())
 
   # view flat file from specified schema
   out <- dplyr::tbl(
@@ -172,7 +193,7 @@ fetch_table <- function(x, schema = "aquatic_data", collect = TRUE, ...) {
 #'
 #' @export
 #'
-fetch_query <- function(query, collect = TRUE, ...) {
+fetch_query <- function(query, collect = FALSE, ...) {
 
   # query must be a function or string
   if (!is.character(query))
@@ -183,39 +204,11 @@ fetch_query <- function(query, collect = TRUE, ...) {
     stop("SQL query has length > 1 but must be a string", .call = FALSE)
 
   # connect to database if required
-  if (!check_aaedb_connection()) {
+  new_connection <- connect_if_required("fetch_query", collect = collect)
 
-    # and kick this connection if the query is executed
-    if (collect)
-      on.exit(aaedb_disconnect())
-
-    # connect to aaedb
-    aaedb_connect()
-
-    # print a note that a database connection is open if
-    #   not collecting
-    if (!collect) {
-      cat(
-        "fetch_query has opened a connection to the AAEDB. ",
-        "This connection must remain open while working with ",
-        "the returned query but can be closed with aaedb_disconnect() ",
-        "once the query has been executed."
-      )
-    }
-
-  }
-
-  # print a note that automatic execution of the query will stop in
-  #   the next version
-  if (collect) {
-    cat(
-      "collect is TRUE (the default), which means the query will be executed",
-      "and the full data set returned. This default setting will reverse",
-      "in version 0.1.0 of the aae.db package and returned queries will need",
-      "to be executed with the collect() function. To return unevaluated",
-      "queries in the current version of aaa.db, set collect = FALSE."
-    )
-  }
+  # and kick this connection on exit if it's new and the query is executed
+  if (collect & new_connection)
+    on.exit(aaedb_disconnect())
 
   # grab query, assuming it's a string SQL query
   out <- dplyr::tbl(DB_ENV$conn, dbplyr::sql(query), ...)
@@ -233,75 +226,60 @@ fetch_query <- function(query, collect = TRUE, ...) {
 #'
 #' @export
 #'
-fetch_project <- function(
-    project_id,
-    range = c(1900, 2099),
-    schema = "aquatic_data",
-    collect = TRUE,
-    ...
-) {
+fetch_project <- function(project_id, collect = FALSE, ...) {
 
   # query must be a function or string
-  if (!project_id %in% c(1, 2, 4, 6:16)) {
+  if (!all((project_id %% 1) == 0)) {
     stop(
-      "project_id must be a valid integer (see ?fetch_project for details)",
+      "project_id must be an integer or vector of ",
+      "integers (see ?fetch_project for details)",
       call. = FALSE
     )
   }
 
-  # check that the query isn't a vector if it's a string
-  if (length(range) != 2) {
-    stop(
-      "range must be a vector with two values (min. and max. year)",
-      .call = FALSE
-    )
-  }
-
   # connect to database if required
-  if (!check_aaedb_connection()) {
+  new_connection <- connect_if_required("fetch_project", collect = collect)
 
-    # and kick this connection if the query is executed
-    if (collect)
-      on.exit(aaedb_disconnect())
+  # and kick this connection on exit if it's new and the query is executed
+  if (collect & new_connection)
+    on.exit(aaedb_disconnect())
 
-    # connect to aaedb
-    aaedb_connect()
+  # grab survey event table
+  survey_event <- fetch_survey_event(project_id) %>%
+    add_electro() %>%
+    add_netting()
 
-    # print a note that a database connection is open if
-    #   not collecting
-    if (!collect) {
-      cat(
-        "fetch_project has opened a connection to the AAEDB.",
-        "This connection must remain open while working with",
-        "the returned query but can be closed with aaedb_disconnect()",
-        "once the query has been executed."
-      )
-    }
+  # grab info on collected and observed taxa
+  taxon_lu <- fetch_taxon_lu()
+  taxa_collected <- fetch_collected(survey_event, taxon_lu)
+  taxa_observed <- fetch_observed(survey_event, taxon_lu, taxa_collected)
+  taxa_all <- taxa_collected %>% dplyr::union_all(taxa_observed)
 
-  }
-
-  # print a note that automatic execution of the query will stop in
-  #   the next version
-  if (collect) {
-    cat(
-      "collect is TRUE (the default), which means the query will be executed",
-      "and the full data set returned. This default setting will reverse",
-      "in version 0.1.0 of the aae.db package and returned queries will need",
-      "to be executed with the collect() function. To return unevaluated",
-      "queries in the current version of aaa.db, set collect = FALSE."
-    )
-  }
-
-  # define the query for a given project and range
-  query_string <- paste0(
-    "get_project_data(", project_id, ", ", range[1], ", ", range[2], ")"
-  )
-
-  # download data for a single project using the get_project_data() function
-  out <- dplyr::tbl(
-    DB_ENV$conn,
-    dbplyr::in_schema(dbplyr::sql(schema), dbplyr::sql(query_string), ...)
-  )
+  # combine everything into a single table
+  out <- survey_event %>%
+    dplyr::left_join(
+      taxa_all %>% dplyr::select(
+        id_surveyevent,
+        id_sample,
+        id_observation,
+        id_taxon,
+        scientific_name,
+        common_name,
+        fork_length_cm,
+        length_cm,
+        weight_g,
+        collected,
+        observed
+      ),
+      by = "id_surveyevent"
+    ) %>%
+    dplyr::arrange(
+      id_site, id_survey, id_surveyevent, scientific_name, common_name
+    ) %>%
+    dplyr::mutate(
+      extracted_ts = dplyr::sql("timezone('Australia/Melbourne'::text, now())")
+    ) %>%
+    dplyr::select(dplyr::all_of(survey_event_return_cols))
 
   # collect data if required
   if (collect)
@@ -309,6 +287,255 @@ fetch_project <- function(
 
   # and return
   out
+
+}
+
+#' @rdname fetch_data
+#'
+#' @export
+#'
+fetch_site_info <- function(x = NULL, pattern = NULL, collect = FALSE) {
+
+  # grab coords for all sites
+  site_info <- fetch_table("site", collect = FALSE) %>%
+    dplyr::select(id_site, waterbody, geom_pnt) %>%
+    dplyr::mutate(
+      longitude = st_x(geom_pnt),
+      latitude = st_y(geom_pnt)
+    ) %>%
+    dplyr::left_join(
+      fetch_table("site_project_lu", collect = FALSE) %>%
+        dplyr::select(id_site, site_name, id_project),
+      by = "id_site"
+    ) %>%
+    dplyr::arrange(id_site)
+
+  # filter based on columns of x if provided
+  if (!is.null(x)) {
+
+    # grab names of all fields in x
+    xcol <- colnames(x)
+
+    # and filter on these one at a time
+    if ("waterbody" %in% xcol) {
+      site_info <- site_info %>%
+        dplyr::filter(waterbody %in% !!unique(x$waterbody))
+    }
+    if ("id_site" %in% xcol) {
+      site_info <- site_info %>%
+        dplyr::filter(id_site %in% !!unique(x$id_site))
+    }
+    if ("site_name" %in% xcol) {
+      site_info <- site_info %>%
+        dplyr::filter(site_name %in% !!unique(x$site_name))
+    }
+    if ("id_project" %in% xcol) {
+      site_info <- site_info %>%
+        dplyr::filter(id_project %in% !!unique(x$id_project))
+    }
+
+  }
+
+  # filters waterbodies based on regex if provided
+  if (!is.null(pattern))
+    site_info <- site_info %>% dplyr::filter(grepl(!!pattern, x = waterbody))
+
+
+  # collect data if required
+  if (collect)
+    site_info <- site_info %>% collect()
+
+  # return
+  site_info
+
+}
+
+#' @rdname fetch_data
+#'
+#' @export
+#'
+fetch_species_info <- function(
+    x = NULL,
+    pattern = NULL,
+    taxon = "Fish",
+    primary_discipline = "Aquatic fauna",
+    collect = FALSE
+) {
+
+  taxon_lu <- fetch_table("taxon_lu", collect = FALSE)
+
+  # filter based on columns of x if provided
+  if (!is.null(x)) {
+
+    # grab names of all fields in x
+    xcol <- colnames(x)
+
+    # and filter on these one at a time
+    if ("scientific_name" %in% xcol) {
+      taxon_lu <- taxon_lu %>%
+        dplyr::filter(scientific_name %in% !!unique(x$scientific_name))
+    }
+    if ("common_name" %in% xcol) {
+      taxon_lu <- taxon_lu %>%
+        dplyr::filter(common_name %in% !!unique(x$common_name))
+    }
+    if ("id_taxon" %in% xcol) {
+      taxon_lu <- taxon_lu %>%
+        dplyr::filter(id_taxon %in% !!unique(x$id_taxon))
+    }
+
+  }
+
+  # filters waterbodies based on regex if provided
+  if (!is.null(pattern)) {
+    taxon_lu <- taxon_lu %>%
+      dplyr::filter(grepl(!!pattern, x = scientific_name))
+  }
+
+  # filter to target taxonomic group
+  if (!is.null(taxon))
+    taxon_lu <- taxon_lu %>% dplyr::filter(taxon_type %in% !!taxon)
+
+  # and discipline
+  if (!is.null(primary_discipline)) {
+    taxon_lu <- taxon_lu %>%
+      dplyr::filter(primary_discipline %in% !!primary_discipline)
+  }
+
+  # collect data if required
+  if (collect)
+    taxon_lu <- taxon_lu %>% collect()
+
+  # return
+  taxon_lu
+
+}
+
+# internal function to fetch survey event info
+fetch_survey_event <- function(project_id) {
+
+  # grab survey event info
+  survey_event_info <- fetch_table("site", collect = FALSE) %>%
+    dplyr::select(id_site, waterbody, site_desc) %>%
+    dplyr::inner_join(
+      fetch_table("survey", collect = FALSE) %>%
+        dplyr::select(
+          id_site, id_survey, id_project, sdate, gear_type, released
+        ),
+      by = "id_site"
+    ) %>%
+    dplyr::mutate(syear = year(sdate)) %>%
+    dplyr::rename(
+      survey_year = syear,
+      survey_date = sdate
+    ) %>%
+    dplyr::left_join(
+      fetch_table("survey_event", collect = FALSE) %>%
+        dplyr::select(
+          id_survey, id_surveyevent, time_start, time_finish, condition
+        ),
+      by = "id_survey"
+    ) %>%
+    dplyr::left_join(
+      fetch_table("site_project_lu", collect = FALSE) %>%
+        dplyr::select(id_site, id_project, site_name),
+      by = c("id_site", "id_project")
+    ) %>%
+    dplyr::filter(
+      id_project %in% project_id,
+      released
+    ) %>%
+    dplyr::mutate(
+      id_site = as.integer(id_site),
+      id_survey = as.integer(id_survey),
+      id_surveyevent = as.integer(id_surveyevent)
+    ) %>%
+    dplyr::select(-released)
+
+}
+
+# internal function to add electrofishing survey metadata
+add_electro <- function(x) {
+  x %>%
+    dplyr::left_join(
+      fetch_table("electro", collect = FALSE) %>%
+        dplyr::select(id_surveyevent, seconds),
+      by = "id_surveyevent"
+    )
+}
+
+# internal function to add netting metadata
+add_netting <- function(x) {
+  x %>%
+    dplyr::left_join(
+      fetch_table("netting", collect = FALSE) %>%
+        dplyr::select(
+          id_surveyevent, id_netting, soak_minutes_per_unit, gear_count
+        ),
+      by = "id_surveyevent"
+    )
+}
+
+# internal function to fetch taxon lookup table
+fetch_taxon_lu <- function(...) {
+  fetch_table("taxon_lu", collect = FALSE) %>%
+    dplyr::select(id_taxon, scientific_name, common_name)
+}
+
+# internal function to fetch info on collected taxa
+fetch_collected <- function(survey_event, taxon_lu) {
+
+  # grab collected table from aaedb and add empty fields
+  #   for compatibility with observation table
+
+  fetch_table("sample", collect = FALSE) %>%
+    dplyr::select(
+      id_surveyevent,
+      id_sample,
+      id_taxon,
+      fork_length_cm,
+      length_cm,
+      weight_g,
+      collected
+    ) %>%
+    dplyr::mutate(
+      id_observation = as.integer(NA),
+      observed = as.integer(NA),
+      id_surveyevent = as.integer(id_surveyevent),
+      id_observation = as.integer(id_observation),
+      id_sample = as.integer(id_sample)
+    ) %>%
+    dplyr::inner_join(
+      survey_event %>% dplyr::select(id_surveyevent),
+      by = "id_surveyevent"
+    ) %>%
+    dplyr::inner_join(taxon_lu, by = "id_taxon")
+
+}
+
+# internal function to fetch info on observed taxa
+fetch_observed <- function(survey_event, taxon_lu, taxa_collected) {
+
+  # grab observation table from aaedb and add empty fields
+  #   for compatibility with collected table
+  fetch_table("observation", collect = FALSE) %>%
+    dplyr::select(id_surveyevent, id_observation, id_taxon, count) %>%
+    dplyr::rename(observed = count) %>%
+    dplyr::mutate(
+      id_sample = as.integer(NA),
+      fork_length_cm = as.numeric(NA),
+      length_cm = as.numeric(NA),
+      weight_g = as.numeric(NA),
+      collected = as.integer(NA),
+      id_surveyevent = as.integer(id_surveyevent),
+      id_observation = as.integer(id_observation)
+    ) %>%
+    dplyr::left_join(
+      survey_event %>% dplyr::select(id_surveyevent),
+      by = "id_surveyevent"
+    ) %>%
+    dplyr::inner_join(taxon_lu, by = "id_taxon") %>%
+    dplyr::select(dplyr::all_of(colnames(taxa_collected)))
 
 }
 
@@ -330,4 +557,36 @@ source_project_name <- c(
   "Index of Estuarine Condition",
   "LTIM Lower Goulburn",
   "IVT Broken Creek"
+)
+
+# internal list of variables to be returned from database
+survey_event_return_cols <- c(
+  "id_site",
+  "waterbody",
+  "site_name",
+  "site_desc",
+  "id_survey",
+  "id_project",
+  "survey_date",
+  "survey_year",
+  "gear_type",
+  "id_surveyevent",
+  "time_start",
+  "time_finish",
+  "condition",
+  "seconds",
+  "id_netting",
+  "soak_minutes_per_unit",
+  "gear_count",
+  "id_sample",
+  "id_observation",
+  "id_taxon",
+  "scientific_name",
+  "common_name",
+  "fork_length_cm",
+  "length_cm",
+  "weight_g",
+  "collected",
+  "observed",
+  "extracted_ts"
 )
