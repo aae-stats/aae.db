@@ -1,6 +1,6 @@
 ## `aae.db`: methods to query the AAEDB
 
-The `aae.db` package is a suite of methods to query and download data from the AAEDB. The current version of this package supports direct downloads of tables from the AAEDB as well as custom queries on the AAEDB.
+The `aae.db` package is a suite of methods to query and download data from the AAEDB. The current version of this package supports direct downloads of tables from the AAEDB as well as queries on the AAEDB with lazy evaluation.
 
 ## Usage
 
@@ -12,12 +12,14 @@ remotes::install_github("aae-stats/aae.db")
 
 The main functions to download data from the AAEDB are `fetch_table`, which return tables by name from the AAEDB, `fetch_query`, which returns custom queries specified as an SQL string, and `fetch_project`, which returns data on individual AAE projects (see `?fetch_project` for a list of projects). By default, these functions assume data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. These functions return either full data sets (as tibbles) or unevaluated queries, which can be  manipulated prior to downloading the data.
 
+There are several helper functions to extract information on sites or species. This information can be filtered based on the sites or species in a downloaded data table, or with regex expressions. See `?fetch_data` for examples.
+
 The AAEDB uses a Microsoft Azure back-end, which requires a connection via the GoConnect VPN as well as a username and password (RStudio will prompt for these). You will not be able to access the AAEDB if you do not have login credentials for GoConnect or the AAEDB.
 
 ```
 # download a flat table of all VEFMAP data
 #  (single download, prompts for credentials each time) 
-vefmap <- fetch_table("v_vefmap_only_flat_data")
+vefmap <- fetch_table("v_vefmap_only_flat_data", collect = TRUE)
 
 # optional: store credentials to avoid re-entering for every connection
 #   (will prompt for username and password)
@@ -27,7 +29,7 @@ vefmap <- fetch_table("v_vefmap_only_flat_data")
 aaedb_connect()
 
 # repeat this, but without evaluating the query
-vefmap_lazy <- fetch_table("v_vefmap_only_flat_data", collect = FALSE)
+vefmap_lazy <- fetch_table("v_vefmap_only_flat_data")
 
 # this lazy query can be manipulated prior to downloading the data,
 #   for example, using the many dplyr methods
