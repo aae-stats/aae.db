@@ -5,6 +5,7 @@
 \alias{aaedb_key_set}
 \alias{aaedb_key_delete}
 \alias{aaedb_disconnect}
+\alias{check_aaedb_connection}
 \title{Open a connection to the AAEDB}
 \usage{
 aaedb_connect(...)
@@ -14,6 +15,8 @@ aaedb_key_set(...)
 aaedb_key_delete(...)
 
 aaedb_disconnect(...)
+
+check_aaedb_connection(...)
 }
 \arguments{
 \item{\dots}{ignored}

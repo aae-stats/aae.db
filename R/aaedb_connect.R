@@ -161,7 +161,13 @@ get_credentials <- function(method, type) {
 
 }
 
-# internal function to check if a connection exists
+#' @title Store database credentials locally
+#'
+#' @export
+#'
+#' @importFrom DBI dbIsValid
+#'
+#' @rdname aaedb_connect
 check_aaedb_connection <- function(...) {
   valid <- !is.null(DB_ENV$conn)
   if (valid)
@@ -189,7 +195,7 @@ connect_if_required <- function(.call, collect) {
         "has opened a connection to the AAEDB.",
         "This connection must remain open while working with",
         "the returned query but can be closed with aaedb_disconnect()",
-        "once the query has been executed."
+        "once the query has been executed.\n\n"
       )
     }
 

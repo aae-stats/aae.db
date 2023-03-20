@@ -1,5 +1,21 @@
 # aae.db (development version)
 
+# aae.db 0.1.0.9001
+
+## Features 
+
+- Add tests (restricted to run locally only due to requirement for
+    DB credentials and VPN)
+
+
+# aae.db 0.1.0.9001
+
+## Features 
+
+- Add method to calculate CPUE directly from the database: `fetch_cpue`
+- Add method to collect information on surveys, including total
+    electrofishing effort: `fetch_survey_info`
+
 
 # aae.db 0.1.0
 
