@@ -5,10 +5,9 @@
 \alias{fetch_table}
 \alias{fetch_query}
 \alias{fetch_project}
-\alias{fetch_site_info}
-\alias{fetch_species_info}
+\alias{fetch_cpue}
 \title{Query the AAEDB and return a query object to be manipulated
-  and downloaded}
+  and evaluated}
 \usage{
 fetch_table(x, schema = "aquatic_data", collect = FALSE, ...)
 
@@ -16,20 +15,10 @@ fetch_query(query, collect = FALSE, ...)
 
 fetch_project(project_id, collect = FALSE, ...)
 
-fetch_site_info(x = NULL, pattern = NULL, collect = FALSE)
-
-fetch_species_info(
-  x = NULL,
-  pattern = NULL,
-  taxon = "Fish",
-  primary_discipline = "Aquatic fauna",
-  collect = FALSE
-)
+fetch_cpue(project_id, collect = FALSE, ...)
 }
 \arguments{
-\item{x}{a collected query (table), used to filter waterbodies, sites
-and projects in \code{fetch_site_info} or species scientific and
-common names in \code{fetch_species_info}}
+\item{x}{a character specifying an individual table in the AAEDB}
 
 \item{schema}{schema in which \code{x} is found. Defaults to
 \code{"aquatic_data"}}
@@ -37,9 +26,7 @@ common names in \code{fetch_species_info}}
 \item{collect}{logical: should a query be executed (\code{TRUE}) or
 evaluated lazily (\code{FALSE}, the default)}
 
-\item{\dots}{additional arguments passed to \link[dbplyr]{tbl_sql} for
-\code{fetch_table} and \code{fetch_query} (ignored in
-\code{fetch_project})}
+\item{\dots}{additional arguments passed to \link[dbplyr]{tbl_sql}}
 
 \item{query}{a character specifying a SQL query}
 
@@ -49,19 +36,8 @@ evaluated lazily (\code{FALSE}, the default)}
  Creek Macquarie Perch, 11 - Lower Goulburn Projects, 12 - Hughes
  Creek Macquarie Perch, 13 - Seven Creeks Macquarie Perch,
  14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
- 16 - IVT Broken Creek)}
-
-\item{pattern}{a regex pattern used to filter waterbodies in
-\code{fetch_site_info} or scientific names in \code{fetch_species_info}}
-
-\item{taxon}{taxonomic group for which data are requested in
-\code{fetch_species_info}. Defaults to "Fish". See examples to extract
-a list of all possible taxonomic groups}
-
-\item{primary_discipline}{discipline for which data are requested in
-\code{fetch_species_info}. Defaults to "Aquatic fauna" but can take
-values of "Aquatic fauna", "Flora", "Aquatic invertebrates",
-"Terrestrial fauna", and "Marine"}
+ 16 - IVT Broken Creek). Any integer values will be accepted but
+ non-existent projects will return an empty query}
 }
 \description{
 \code{fetch_table}, \code{fetch_query}, and
@@ -85,13 +61,12 @@ values of "Aquatic fauna", "Flora", "Aquatic invertebrates",
   allowing custom queries. This may be especially useful when working
   with large spatial data sets.
 
-  Update: the \code{fetch_} functions now return an unevaluated query
-  rather than a full data table. This allows further filtering or
-  changes to the query using \code{dplyr} methods prior to downloading
-  the data. This is especially useful when downloading a subset of a
-  much larger data sets. All three methods will remain available in
-  future versions but may be renamed to better reflect their intended
-  use.
+  Update for version 0.1.0: the \code{fetch_} functions now return an
+  unevaluated query rather than a full data table. This allows further
+  filtering or changes to the query using \code{dplyr} methods prior to
+  downloading the data. This is especially useful when downloading a subset
+  of a much larger data sets. All three methods will remain available in
+  future versions but may be renamed to better reflect their intended use.
 }
 \examples{
 # connect to the AAEDB
@@ -100,8 +75,8 @@ aaedb_connect()
 # dplyr methods used below
 library(dplyr)
 
-# set up a query that includes the full flat VEFMAP data set
-vefmap <- fetch_table("v_vefmap_only_flat_data")
+# set up a query that includes the full VEFMAP data set
+vefmap <- fetch_project(2)
 
 # can manipulate and filter this query with dplyr methods
 vefmap <- vefmap \%>\%
@@ -112,40 +87,6 @@ vefmap <- vefmap \%>\%
 
 # evaluate this query with collect
 vefmap <- vefmap \%>\% collect()
-
-# fetch information on the sites in a data set
-vefmap_site_info <- fetch_site_info(vefmap)
-
-# "spatialise" this information
-library(sf)
-vefmap_site_info <- vefmap_site_info \%>\%
-  filter(!is.na(geom_pnt)) \%>\%
-  collect()
-vefmap_sf <- vefmap_site_info \%>\%
-  st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
-
-# or for all sites (optionally matching a regex expression)
-murray_site_info <- fetch_site_info(pattern = "^Murray")
-
-# extract information on the species in a data set
-fetch_species_info(vefmap)
-
-# or for all species with scientific names matching a pattern
-fetch_species_info(pattern = "Maccull")
-
-# list all taxonomic groups for use in fetch_species_info
-fetch_table("taxon_lu", collect = FALSE) \%>\%
-  select(taxon_type) \%>\%
-  collect() \%>\%
-  pull(taxon_type) \%>\%
-  unique()
-
-# and download data for one group (setting primary_discipline to NULL
-#   to override default setting)
-fetch_species_info(
-  taxon = "Aquatic invertebrates",
-  primary_discipline = NULL
-)
 
 # process a simple SQL query to list all projects with data from the
 #   Ovens river
@@ -160,7 +101,8 @@ survey_info <- fetch_query(
 )
 survey_info <- survey_info \%>\% collect()
 
-# process this same query using dplyr methods
+# process this same query using raw tables from the database
+#   and `dplyr` methods
 site_data <- fetch_table("site")
 survey_data <- fetch_table("survey")
 survey_info_dplyr <- site_data \%>\%
