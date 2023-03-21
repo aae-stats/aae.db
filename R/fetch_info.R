@@ -296,13 +296,15 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
       waterbody,
       id_site,
       site_name,
+      sdate,
       geom_pnt,
       latitude,
       longitude,
       id_survey,
       gear_type,
       seconds
-    )
+    ) %>%
+    rename(survey_date = sdate)
 
   # return
   survey_info
