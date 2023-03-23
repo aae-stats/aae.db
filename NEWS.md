@@ -4,7 +4,7 @@
 
 ## Features 
 
-- Include reach information in `fetch_site_info` output
+- Include reach information in `fetch_site_info` and `fetch_survey_info`
 
 
 # aae.db 0.1.0.9002
