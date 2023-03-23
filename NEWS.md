@@ -1,5 +1,13 @@
 # aae.db (development version)
 
+# aae.db 0.1.0.9004
+
+## Features 
+
+- Add method to list tables in available schema: `list_tables`
+- Add tests for `list_tables` and extend tests of `fetch_data`
+
+
 # aae.db 0.1.0.9003
 
 ## Features 
