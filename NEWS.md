@@ -1,6 +1,13 @@
 # aae.db (development version)
 
-# aae.db 0.1.0.9001
+# aae.db 0.1.0.9003
+
+## Features 
+
+- Include reach information in `fetch_site_info` output
+
+
+# aae.db 0.1.0.9002
 
 ## Features 
 
