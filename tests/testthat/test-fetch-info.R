@@ -7,6 +7,7 @@ test_that("fetch_info functions return matches to a query", {
   # check if we can connect to the database
   aaedb_connect()
   aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
 
   # set up a query that includes the full VEFMAP data set
   vefmap <- fetch_project(2)
@@ -41,6 +42,7 @@ test_that("fetch_info functions return matches to a table", {
   # check if we can connect to the database
   aaedb_connect()
   aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
 
   # set up a query that includes the full VEFMAP data set
   vefmap <- fetch_project(2)
@@ -81,6 +83,7 @@ test_that("fetch_info functions return matches to a regex pattern", {
   # check if we can connect to the database
   aaedb_connect()
   aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
 
   # fetch information on the sites in a data set
   vefmap_site_info1 <- fetch_site_info(pattern = "^Campa")
