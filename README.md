@@ -56,6 +56,25 @@ vefmap <- vefmap %>% collect()
 ```
 
 
+Alternatively, there is a `fetch_cpue` function that can be used to download pre-calculated CPUE values for a given project or set of projects. This approach is recommended when downloading CPUE data and will avoid errors in calculating effort and full survey tables from the individual-level records returned by `fetch_project`.
+
+```
+# specify a query to return all CPUE data for the VEFMAP project
+vefmap_cpue <- fetch_cpue(2)
+
+# filter this down to a single system and species prior to downloading data
+vefmap_cpue <- vefmap_cpue %>%
+  filter(
+    grepl("campaspe", waterbody, ignore.case = TRUE),
+    scientific_name == "Maccullochella peelii"
+  )
+  
+# once you're done editing the query, you can download the data set
+#   with the collect() function
+vefmap_cpue <- vefmap_cpue %>% collect()
+```
+
+
 There are several helper functions to extract information on sites or species. This information can be filtered based on the sites or species in a downloaded data table, or with regex expressions.
 
 ```
@@ -90,7 +109,7 @@ vefmap_sf %>%
 ```
 
 
-Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB, and a list of available schema is included in `?list_table`.
+Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB (see`?list_table` for a list of all available schema).
 
 ```
 # use dplyr tools to download information on all sites in the Ovens River
