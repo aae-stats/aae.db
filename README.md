@@ -12,6 +12,8 @@ remotes::install_github("aae-stats/aae.db")
 ```
 
 
+### Connecting to the database
+
 The AAEDB uses a Microsoft Azure back-end, which requires a connection via the GoConnect VPN as well as a username and password (RStudio will prompt for these). You will not be able to access the AAEDB if you do not have login credentials for GoConnect or the AAEDB.
 
 The simplest way to connect to the database is to connect once for an entire session. To reduce the number of times you have to enter your credentials, you can use the `aaedb_key_set()` function to store your credentials in your system's credentials manager (e.g. keychain).
@@ -26,6 +28,8 @@ aaedb_connect()
 ```
 
 
+### Accessing all survey record for a project
+
 Once connected to the database, the main function to download data from the AAEDB is `fetch_project`, which is recommended for most applications. The `fetch_project` function returns data for specific projects (see `?fetch_data` for a list of projects), and can return data for multiple projects simultaneously.
 
 ```
@@ -36,6 +40,8 @@ vefmap <- fetch_project(2)
 vefmap_nfrc <- fetch_project(c(2, 4))
 ```
 
+
+### Manipulating queries prior to downloading data
 
 Queries can be manipulated prior to downloading the data, for example, using dplyr methods to filter to Murray cod observations in waterbodies containing the term "campaspe" (not case-sensitive) and select a subset of columns. More complex operations are possible, such as forming joins or unions of multiple queries.
 
@@ -56,7 +62,9 @@ vefmap <- vefmap %>% collect()
 ```
 
 
-Alternatively, there is a `fetch_cpue` function that can be used to download pre-calculated CPUE values for a given project or set of projects. This approach is recommended when downloading CPUE data and will avoid errors in calculating effort and full survey tables from the individual-level records returned by `fetch_project`.
+### Accessing CPUE estimates for a project
+
+There is a `fetch_cpue` function that can be used to download pre-calculated CPUE values for a given project or set of projects. This approach is recommended when downloading CPUE data and will avoid errors in calculating effort and full survey tables from the individual-level records returned by `fetch_project`.
 
 ```
 # specify a query to return all CPUE data for the VEFMAP project
@@ -75,6 +83,8 @@ vefmap_cpue <- vefmap_cpue %>% collect()
 ```
 
 
+### Downloading extra information on sites, surveys, and species
+
 There are several helper functions to extract information on sites or species. This information can be filtered based on the sites or species in a downloaded data table, or with regex expressions.
 
 ```
@@ -89,6 +99,8 @@ species_info <- fetch_species_info(vefmap)
 goulburn_site_info <- fetch_site_info(pattern = "Goulburn")
 ```
 
+
+### Spatialising information from the database
 
 With the tools in the `sf` package, the site information can be "spatialised" for use in mapping or analyses that require spatial locations.
 
@@ -108,6 +120,8 @@ vefmap_sf %>%
   mapview(col.regions = "DarkGreen", label = "site_name", layer.name = "Survey site")
 ```
 
+
+### Advanced methods: interacting directly with tables and SQL queries
 
 Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB (see`?list_table` for a list of all available schema).
 
