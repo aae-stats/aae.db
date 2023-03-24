@@ -90,7 +90,7 @@ vefmap_sf %>%
 ```
 
 
-Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified.
+Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB, and a list of available schema is included in `?list_table`.
 
 ```
 # use dplyr tools to download information on all sites in the Ovens River
@@ -114,6 +114,15 @@ survey_info <- fetch_query(
 # and collect this data set
 survey_info <- survey_info %>% collect()
 
+# list all tables in the aquatic_data schema
+list_tables() %>% collect()
+
+# list all tables in the spatial schema
+list_tables(schema = "spatial") %>% collect()
+
+# access the help file for list_table to see all available schema
+?list_tables
+
 # optional: disconnect from the AAEDB
 #   (automatically happens when the R session ends)
 # aaedb_disconnect()
@@ -124,5 +133,5 @@ survey_info <- survey_info %>% collect()
 
 Please leave feedback, bug reports, or feature requests at the GitHub [issues page](https://github.com/aae-stats/aae.db/issues).
 
-Last updated: 16 March 2023 
+Last updated: 24 March 2023 
 
