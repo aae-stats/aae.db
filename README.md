@@ -28,7 +28,7 @@ aaedb_connect()
 ```
 
 
-### Accessing all survey record for a project
+### Accessing all survey records for a project
 
 Once connected to the database, the main function to download data from the AAEDB is `fetch_project`, which is recommended for most applications. The `fetch_project` function returns data for specific projects (see `?fetch_data` for a list of projects), and can return data for multiple projects simultaneously.
 
@@ -62,7 +62,7 @@ vefmap <- vefmap %>% collect()
 ```
 
 
-### Accessing CPUE estimates for a project
+### Downloading CPUE estimates for a project
 
 There is a `fetch_cpue` function that can be used to download pre-calculated CPUE values for a given project or set of projects. This approach is recommended when downloading CPUE data and will avoid errors in calculating effort and full survey tables from the individual-level records returned by `fetch_project`.
 
