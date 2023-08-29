@@ -5,11 +5,12 @@
 #'
 #' @export
 #'
-#' @importFrom dplyr all_of distinct filter full_join group_by inner_join
-#'   left_join mutate rename select summarise tbl ungroup union_all
+#' @importFrom dplyr all_of distinct filter full_join group_by
+#'   inner_join left_join mutate rename select summarise tbl
+#'   ungroup union_all
 #' @importFrom dbplyr in_schema sql
 #' @importFrom tidyr complete nesting
-#' @importFrom rlang `!!` syms
+#' @importFrom rlang `!!` sym
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
@@ -25,10 +26,9 @@
 #'    non-existent projects will return an empty query
 #' @param collect logical: should a query be executed (\code{TRUE}) or
 #'   evaluated lazily (\code{FALSE}, the default)
-#' @param criterion \code{list} containing `fn` and `vars` elements
-#'   specifiying a function that evaluates each row as `TRUE` or `FALSE`
-#'   based on `vars`. Allows complex filtering such as length thresholds
-#'   for inclusion in CPUE estimates
+#' @param criterion \code{list} containing `var`, `lower`, and `upper` elements
+#'   specifying bounds on `var`. Allows complex filtering such as restricting
+#'   CPUE estimates to a specific length or weight range
 #' @param \dots additional arguments passed to \link[dbplyr]{tbl_sql}
 #'
 #' @description \code{fetch_table}, \code{fetch_query}, and
@@ -281,6 +281,9 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
       taxa_all %>% dplyr::select(
         id_surveyevent,
         scientific_name,
+        fork_length_cm,
+        length_cm,
+        weight_g,
         collected,
         observed
       ),
@@ -295,12 +298,13 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
   # apply criterion if needed (allows setting a subset of rows to zero
   #   catch based on a specified function and variables)
   survey_event <- survey_event |>
-    mutate(criterion = TRUE)
+    dplyr::mutate(criterion = TRUE)
   if (!is.null(criterion)) {
     survey_event <- survey_event |>
-      rowwise() |>
-      mutate(criterion = criterion$fn(!!!rlang::syms(criterion$vars))) |>
-      ungroup()
+      mutate(
+        criterion = (!!rlang::sym(criterion$var) > !!criterion$lower) &
+          (!!rlang::sym(criterion$var) <= !!criterion$upper)
+      )
   }
 
   # calculate total catch per survey

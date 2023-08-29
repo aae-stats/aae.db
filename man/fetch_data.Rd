@@ -39,10 +39,9 @@ evaluated lazily (\code{FALSE}, the default)}
  16 - IVT Broken Creek). Any integer values will be accepted but
  non-existent projects will return an empty query}
 
-\item{criterion}{\code{list} containing `fn` and `vars` elements
-specifiying a function that evaluates each row as `TRUE` or `FALSE`
-based on `vars`. Allows complex filtering such as length thresholds
-for inclusion in CPUE estimates}
+\item{criterion}{\code{list} containing `var`, `lower`, and `upper` elements
+specifying bounds on `var`. Allows complex filtering such as restricting
+CPUE estimates to a specific length or weight range}
 }
 \description{
 \code{fetch_table}, \code{fetch_query}, and
