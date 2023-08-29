@@ -122,7 +122,7 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
         dplyr::select(id_site, site_name, id_project),
       by = "id_site"
     ) %>%
-    dplyr::left_join(fetch_table("vewh_reach_lu"), by = "id_site")
+    dplyr::left_join(fetch_table("vewh_reach_lu", "projects"), by = "id_site")
 
   # filter based on columns of x if provided
   if (!is.null(x)) {
