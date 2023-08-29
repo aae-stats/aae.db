@@ -9,7 +9,7 @@
 #'   left_join mutate rename select summarise tbl ungroup union_all
 #' @importFrom dbplyr in_schema sql
 #' @importFrom tidyr complete nesting
-#' @importFrom rlang `!!`
+#' @importFrom rlang `!!` syms
 #'
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
@@ -25,6 +25,10 @@
 #'    non-existent projects will return an empty query
 #' @param collect logical: should a query be executed (\code{TRUE}) or
 #'   evaluated lazily (\code{FALSE}, the default)
+#' @param criterion \code{list} containing `fn` and `vars` elements
+#'   specifiying a function that evaluates each row as `TRUE` or `FALSE`
+#'   based on `vars`. Allows complex filtering such as length thresholds
+#'   for inclusion in CPUE estimates
 #' @param \dots additional arguments passed to \link[dbplyr]{tbl_sql}
 #'
 #' @description \code{fetch_table}, \code{fetch_query}, and
@@ -243,7 +247,7 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
 #'
 #' @export
 #'
-fetch_cpue <- function(project_id, collect = FALSE, ...) {
+fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
 
   # query must be a function or string
   if (!all((project_id %% 1) == 0)) {
@@ -288,11 +292,24 @@ fetch_cpue <- function(project_id, collect = FALSE, ...) {
     ) %>%
     dplyr::select(-time_start, -time_finish, -condition)
 
+  # apply criterion if needed (allows setting a subset of rows to zero
+  #   catch based on a specified function and variables)
+  survey_event <- survey_event |>
+    mutate(criterion = TRUE)
+  if (!is.null(criterion)) {
+    survey_event <- survey_event |>
+      rowwise() |>
+      mutate(criterion = criterion$fn(!!!rlang::syms(criterion$vars))) |>
+      ungroup()
+  }
+
   # calculate total catch per survey
   catch <- survey_event %>%
     dplyr::mutate(
       collected = ifelse(is.na(collected), 0, collected),
       observed = ifelse(is.na(observed), 0, observed),
+      collected = ifelse(criterion, collected, 0),
+      observed = ifelse(criterion, observed, 0),
       catch = collected + observed
     ) %>%
     dplyr::group_by(

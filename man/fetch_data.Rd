@@ -15,7 +15,7 @@ fetch_query(query, collect = FALSE, ...)
 
 fetch_project(project_id, collect = FALSE, ...)
 
-fetch_cpue(project_id, collect = FALSE, ...)
+fetch_cpue(project_id, collect = FALSE, criterion = NULL, ...)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
@@ -38,6 +38,11 @@ evaluated lazily (\code{FALSE}, the default)}
  14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
  16 - IVT Broken Creek). Any integer values will be accepted but
  non-existent projects will return an empty query}
+
+\item{criterion}{\code{list} containing `fn` and `vars` elements
+specifiying a function that evaluates each row as `TRUE` or `FALSE`
+based on `vars`. Allows complex filtering such as length thresholds
+for inclusion in CPUE estimates}
 }
 \description{
 \code{fetch_table}, \code{fetch_query}, and
