@@ -70,6 +70,8 @@ list_tables <- function(schema = "aquatic_data", ..., collect = FALSE) {
 available_schema <- c(
   "aquatic_data",
   "public",
+  "projects",
+  "edna",
   "spatial",
   "spatial_isc",
   "stream_network"
