@@ -64,7 +64,7 @@ aaedb_connect <- function(...) {
     DB_ENV$conn <- DBI::dbConnect(
       RPostgres::Postgres(),
       dbname = "aae_db",
-      host = "10.110.7.134",
+      host = "dev-aae-psql-01.postgres.database.azure.com",
       port = "5432",
       user = get_credentials(pwd_method, type = "username"),
       password = get_credentials(pwd_method, type = "password")
@@ -81,7 +81,7 @@ aaedb_connect <- function(...) {
     DB_ENV$conn <- DBI::dbConnect(
       RPostgres::Postgres(),
       dbname = "aae_db",
-      host = "10.110.7.134",
+      host = "dev-aae-psql-01.postgres.database.azure.com",
       port = "5432",
       user = get_credentials(pwd_method, type = "username"),
       password = get_credentials(pwd_method, type = "password")
