@@ -1,5 +1,13 @@
 # aae.db (development version)
 
+# aae.db 0.1.0.9005
+
+## Features
+
+- Fix reach look-up table
+- Replace `%>%` with `|>` throughout
+
+
 # aae.db 0.1.0.9004
 
 ## Features 

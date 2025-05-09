@@ -1,10 +1,3 @@
-#' @name %>%
-#' @rdname pipe
-#'
-#' @importFrom magrittr %>%
-#' @export
-magrittr::`%>%`
-
 #' @name collect
 #' @rdname collect
 #'

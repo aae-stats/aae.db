@@ -35,30 +35,30 @@
 #' vefmap <- fetch_project(2)
 #'
 #' # can manipulate and filter this query with dplyr methods
-#' vefmap <- vefmap %>%
+#' vefmap <- vefmap |>
 #'   filter(
 #'     waterbody == "Campaspe River",
 #'     scientific_name == "Maccullochella peelii"
 #'   )
 #'
 #' # evaluate this query with collect
-#' vefmap <- vefmap %>% collect()
+#' vefmap <- vefmap |> collect()
 #'
 #' # fetch information on the sites in a data set
 #' vefmap_site_info <- fetch_site_info(vefmap)
 #'
 #' # "spatialise" this information with the `sf` package
 #' library(sf)
-#' vefmap_site_info <- vefmap_site_info %>%
-#'   filter(!is.na(geom_pnt)) %>%
+#' vefmap_site_info <- vefmap_site_info |>
+#'   filter(!is.na(geom_pnt)) |>
 #'   collect()
-#' vefmap_sf <- vefmap_site_info %>%
+#' vefmap_sf <- vefmap_site_info |>
 #'   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
 #'
 #' # and make a basic map with the `mapview` package
 #' library(mapview)
-#' vefmap_sf %>%
-#'   select(-geom_pnt) %>%
+#' vefmap_sf |>
+#'   select(-geom_pnt) |>
 #'   mapview(
 #'     col.regions = "DarkGreen",
 #'     label = "site_name",
@@ -79,17 +79,17 @@
 #' fetch_species_info(pattern = "Maccull", ignore.case = TRUE)
 #'
 #' # list all taxonomic groups for use in fetch_species_info
-#' fetch_table("taxon_lu", collect = FALSE) %>%
-#'   select(taxon_type) %>%
-#'   collect() %>%
-#'   pull(taxon_type) %>%
+#' fetch_table("taxon_lu", collect = FALSE) |>
+#'   select(taxon_type) |>
+#'   collect() |>
+#'   pull(taxon_type) |>
 #'   unique()
 #'
 #' # or list all primary disciplines for use in fetch_species_info
-#' fetch_table("taxon_lu", collect = FALSE) %>%
-#'   select(primary_discipline) %>%
-#'   collect() %>%
-#'   pull(primary_discipline) %>%
+#' fetch_table("taxon_lu", collect = FALSE) |>
+#'   select(primary_discipline) |>
+#'   collect() |>
+#'   pull(primary_discipline) |>
 #'   unique()
 #'
 #' # and download data for one group (setting primary_discipline to NULL
@@ -111,18 +111,18 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
     stop("x must be an unevaluated query or tbl/data.frame", call. = FALSE)
 
   # grab coords for all sites
-  site_info <- fetch_table("site") %>%
-    dplyr::select(id_site, waterbody, geom_pnt) %>%
+  site_info <- fetch_table("site") |>
+    dplyr::select(id_site, waterbody, geom_pnt) |>
     dplyr::mutate(
       longitude = st_x(geom_pnt),
       latitude = st_y(geom_pnt)
-    ) %>%
+    ) |>
     dplyr::left_join(
-      fetch_table("site_project_lu") %>%
+      fetch_table("site_project_lu") |>
         dplyr::select(id_site, site_name, id_project),
       by = "id_site"
-    ) %>%
-    dplyr::left_join(fetch_table("vewh_reach_lu", "projects"), by = "id_site")
+    ) |>
+    dplyr::left_join(fetch_table("reach_lu"), by = "id_site")
 
   # filter based on columns of x if provided
   if (!is.null(x)) {
@@ -135,17 +135,17 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
       "waterbody", "reach_no", "id_site", "site_name", "id_project"
     )
     available_targets <- xcol[xcol %in% target_cols]
-    xval <- x %>% dplyr::select(dplyr::all_of(available_targets))
+    xval <- x |> dplyr::select(dplyr::all_of(available_targets))
     if ("tbl_PqConnection" %in% class(x))
-      xval <- xval %>% collect()
+      xval <- xval |> collect()
 
     # and filter on these one at a time
     for (i in seq_along(available_targets)) {
-      unique_xval <- xval %>%
-        dplyr::select(dplyr::all_of(available_targets[i])) %>%
-        unlist() %>%
+      unique_xval <- xval |>
+        dplyr::select(dplyr::all_of(available_targets[i])) |>
+        unlist() |>
         unique()
-      site_info <- site_info %>%
+      site_info <- site_info |>
         dplyr::filter(
           !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
         )
@@ -170,7 +170,7 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
     # filter all string columns based on these settings
     string_cols <- c("waterbody", "site_name")
     for (i in seq_along(string_cols)) {
-      site_info <- site_info %>%
+      site_info <- site_info |>
         dplyr::filter(
           grepl(
             x = !!rlang::parse_expr(string_cols[i]),
@@ -187,10 +187,10 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
 
   # collect data if required
   if (collect)
-    site_info <- site_info %>% collect()
+    site_info <- site_info |> collect()
 
   # and arrange by site
-  site_info <- site_info %>%
+  site_info <- site_info |>
     dplyr::select(
       id_project,
       waterbody,
@@ -221,14 +221,14 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     stop("x must be an unevaluated query or tbl/data.frame", call. = FALSE)
 
   # grab coords for all sites
-  site_info <- fetch_table("site") %>%
-    dplyr::select(waterbody, id_site, site_name, geom_pnt) %>%
+  site_info <- fetch_table("site") |>
+    dplyr::select(waterbody, id_site, site_name, geom_pnt) |>
     dplyr::mutate(
       longitude = st_x(geom_pnt),
       latitude = st_y(geom_pnt)
-    ) %>%
-    dplyr::left_join(fetch_table("vewh_reach_lu"), by = "id_site")
-  survey_info <- fetch_survey_table(seq_len(20)) %>%
+    ) |>
+    dplyr::left_join(fetch_table("reach_lu"), by = "id_site")
+  survey_info <- fetch_survey_table(seq_len(20)) |>
     dplyr::left_join(site_info, by = "id_site")
 
   # filter based on columns of x if provided
@@ -240,17 +240,17 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     # pull out main columns of x and collect if it's an unevaluated query
     target_cols <- c("waterbody", "reach_no", "id_site", "id_project", "id_survey")
     available_targets <- xcol[xcol %in% target_cols]
-    xval <- x %>% dplyr::select(dplyr::all_of(available_targets))
+    xval <- x |> dplyr::select(dplyr::all_of(available_targets))
     if ("tbl_PqConnection" %in% class(x))
-      xval <- xval %>% collect()
+      xval <- xval |> collect()
 
     # and filter on these one at a time
     for (i in seq_along(available_targets)) {
-      unique_xval <- xval %>%
-        dplyr::select(dplyr::all_of(available_targets[i])) %>%
-        unlist() %>%
+      unique_xval <- xval |>
+        dplyr::select(dplyr::all_of(available_targets[i])) |>
+        unlist() |>
         unique()
-      survey_info <- survey_info %>%
+      survey_info <- survey_info |>
         dplyr::filter(
           !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
         )
@@ -275,7 +275,7 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     # filter all string columns based on these settings
     string_cols <- c("waterbody", "site_name", "gear_type")
     for (i in seq_along(string_cols)) {
-      survey_info <- survey_info %>%
+      survey_info <- survey_info |>
         dplyr::filter(
           grepl(
             x = !!rlang::parse_expr(string_cols[i]),
@@ -292,10 +292,10 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
 
   # collect data if required
   if (collect)
-    survey_info <- survey_info %>% collect()
+    survey_info <- survey_info |> collect()
 
   # and arrange by site
-  survey_info <- survey_info %>%
+  survey_info <- survey_info |>
     dplyr::select(
       id_project,
       waterbody,
@@ -309,7 +309,7 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
       id_survey,
       gear_type,
       seconds
-    ) %>%
+    ) |>
     rename(survey_date = sdate)
 
   # return
@@ -346,17 +346,17 @@ fetch_species_info <- function(
     # pull out main columns of x and collect if it's an unevaluated query
     target_cols <- c("scientific_name", "common_name")
     available_targets <- xcol[xcol %in% target_cols]
-    xval <- x %>% dplyr::select(dplyr::all_of(available_targets))
+    xval <- x |> dplyr::select(dplyr::all_of(available_targets))
     if (inherits(x, "tbl_PqConnection"))
-      xval <- xval %>% collect()
+      xval <- xval |> collect()
 
     # and filter on these one at a time
     for (i in seq_along(available_targets)) {
-      unique_xval <- xval %>%
-        dplyr::select(dplyr::all_of(available_targets[i])) %>%
-        unlist() %>%
+      unique_xval <- xval |>
+        dplyr::select(dplyr::all_of(available_targets[i])) |>
+        unlist() |>
         unique()
-      taxon_lu <- taxon_lu %>%
+      taxon_lu <- taxon_lu |>
         dplyr::filter(
           !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
         )
@@ -387,7 +387,7 @@ fetch_species_info <- function(
       "taxon_type"
     )
     for (i in seq_along(string_cols)) {
-      taxon_lu <- taxon_lu %>%
+      taxon_lu <- taxon_lu |>
         dplyr::filter(
           grepl(
             x = !!rlang::parse_expr(string_cols[i]),
@@ -404,10 +404,10 @@ fetch_species_info <- function(
 
   # collect data if required
   if (collect)
-    taxon_lu <- taxon_lu %>% collect()
+    taxon_lu <- taxon_lu |> collect()
 
   # and arrange by scientific name
-  taxon_lu <- taxon_lu %>%
+  taxon_lu <- taxon_lu |>
     dplyr::arrange(scientific_name)
 
   # return

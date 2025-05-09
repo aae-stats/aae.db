@@ -28,10 +28,10 @@
 #' library(dplyr)
 #'
 #' # list all tables in the aquatic_data schema
-#' list_tables() %>% collect()
+#' list_tables() |> collect()
 #'
 #' # list all tables in the spatial schema
-#' list_tables(schema = "spatial") %>% collect()
+#' list_tables(schema = "spatial") |> collect()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
 #' #   when all queries and evaluation is complete
@@ -52,14 +52,14 @@ list_tables <- function(schema = "aquatic_data", ..., collect = FALSE) {
 
 
   # list all the tables in the requested schema, sorted by table_type
-  table <- fetch_table("tables", schema = "information_schema", ...) %>%
-    filter(table_schema == !!schema) %>%
-    select(table_catalog, table_schema, table_name, table_type) %>%
+  table <- fetch_table("tables", schema = "information_schema", ...) |>
+    filter(table_schema == !!schema) |>
+    select(table_catalog, table_schema, table_name, table_type) |>
     arrange(table_type)
 
   # collect if required
   if (collect)
-    table <- table %>% collect()
+    table <- table |> collect()
 
   # return
   table

@@ -70,14 +70,14 @@
 #' vefmap <- fetch_project(2)
 #'
 #' # can manipulate and filter this query with dplyr methods
-#' vefmap <- vefmap %>%
+#' vefmap <- vefmap |>
 #'   filter(
 #'     waterbody == "Campaspe River",
 #'     scientific_name == "Maccullochella peelii"
 #'   )
 #'
 #' # evaluate this query with collect
-#' vefmap <- vefmap %>% collect()
+#' vefmap <- vefmap |> collect()
 #'
 #' # process a simple SQL query to list all projects with data from the
 #' #   Ovens river
@@ -90,30 +90,30 @@
 #'      ORDER by waterbody, id_project",
 #'   collect = FALSE
 #' )
-#' survey_info <- survey_info %>% collect()
+#' survey_info <- survey_info |> collect()
 #'
 #' # process this same query using raw tables from the database
 #' #   and `dplyr` methods
 #' site_data <- fetch_table("site")
 #' survey_data <- fetch_table("survey")
-#' survey_info_dplyr <- site_data %>%
+#' survey_info_dplyr <- site_data |>
 #'   left_join(
-#'     survey_data %>% distinct(id_site, id_project),
+#'     survey_data |> distinct(id_site, id_project),
 #'     by = "id_site"
-#'   ) %>%
-#'   filter(grepl("ovens", waterbody, ignore.case = TRUE)) %>%
-#'   distinct(waterbody, id_project) %>%
-#'   arrange(waterbody, id_project) %>%
+#'   ) |>
+#'   filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
+#'   distinct(waterbody, id_project) |>
+#'   arrange(waterbody, id_project) |>
 #'   collect()
 #'
 #' # and grab information for individual projects
 #' ovens_data <- fetch_project(9)
-#' ovens_data <- ovens_data %>% collect()
+#' ovens_data <- ovens_data |> collect()
 #'
 #' # subset this to 2015-2017 surveys
 #' ovens_data <- fetch_project(9)
-#' ovens_data <- ovens_data %>%
-#'   filter(survey_year %in% c(2015:2017)) %>%
+#' ovens_data <- ovens_data |>
+#'   filter(survey_year %in% c(2015:2017)) |>
 #'   collect()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
@@ -139,7 +139,7 @@ fetch_table <- function(x, schema = "aquatic_data", collect = FALSE, ...) {
 
   # collect data if required
   if (collect)
-    out <- out %>% collect()
+    out <- out |> collect()
 
   # return
   out
@@ -172,7 +172,7 @@ fetch_query <- function(query, collect = FALSE, ...) {
 
   # collect data if required
   if (collect)
-    out <- out %>% collect()
+    out <- out |> collect()
 
   # return
   out
@@ -202,20 +202,20 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
     on.exit(aaedb_disconnect())
 
   # grab survey event table
-  survey_event <- fetch_survey_event(project_id, ...) %>%
-    add_electro(...) %>%
+  survey_event <- fetch_survey_event(project_id, ...) |>
+    add_electro(...) |>
     add_netting(...)
 
   # grab info on collected and observed taxa
   taxon_lu <- fetch_taxon_lu(...)
   taxa_collected <- fetch_collected(survey_event, taxon_lu, ...)
   taxa_observed <- fetch_observed(survey_event, taxon_lu, taxa_collected, ...)
-  taxa_all <- taxa_collected %>% dplyr::union_all(taxa_observed)
+  taxa_all <- taxa_collected |> dplyr::union_all(taxa_observed)
 
   # combine everything into a single table
-  out <- survey_event %>%
+  out <- survey_event |>
     dplyr::left_join(
-      taxa_all %>% dplyr::select(
+      taxa_all |> dplyr::select(
         id_surveyevent,
         id_sample,
         id_observation,
@@ -228,15 +228,15 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
         observed
       ),
       by = "id_surveyevent"
-    ) %>%
+    ) |>
     dplyr::mutate(
       extracted_ts = dplyr::sql("timezone('Australia/Melbourne'::text, now())")
-    ) %>%
+    ) |>
     dplyr::select(dplyr::all_of(survey_event_return_cols))
 
   # collect data if required
   if (collect)
-    out <- out %>% collect()
+    out <- out |> collect()
 
   # and return
   out
@@ -266,19 +266,19 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
     on.exit(aaedb_disconnect())
 
   # grab survey event table
-  survey_event <- fetch_survey_event(project_id, ...) %>%
+  survey_event <- fetch_survey_event(project_id, ...) |>
     add_electro(...)
 
   # grab info on collected and observed taxa
   taxon_lu <- fetch_taxon_lu(...)
   taxa_collected <- fetch_collected(survey_event, taxon_lu, ...)
   taxa_observed <- fetch_observed(survey_event, taxon_lu, taxa_collected, ...)
-  taxa_all <- taxa_collected %>% dplyr::union_all(taxa_observed)
+  taxa_all <- taxa_collected |> dplyr::union_all(taxa_observed)
 
   # combine everything into a single table and keep only EF surveys
-  survey_event <- survey_event %>%
+  survey_event <- survey_event |>
     dplyr::left_join(
-      taxa_all %>% dplyr::select(
+      taxa_all |> dplyr::select(
         id_surveyevent,
         scientific_name,
         fork_length_cm,
@@ -288,11 +288,11 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
         observed
       ),
       by = "id_surveyevent"
-    ) %>%
+    ) |>
     dplyr::filter(
       grepl(!!"EF", gear_type),
       condition == !!"FISHABLE"
-    ) %>%
+    ) |>
     dplyr::select(-time_start, -time_finish, -condition)
 
   # apply criterion if needed (allows setting a subset of rows to zero
@@ -308,14 +308,14 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
   }
 
   # calculate total catch per survey
-  catch <- survey_event %>%
+  catch <- survey_event |>
     dplyr::mutate(
       collected = ifelse(is.na(collected), 0, collected),
       observed = ifelse(is.na(observed), 0, observed),
       collected = ifelse(criterion, collected, 0),
       observed = ifelse(criterion, observed, 0),
       catch = collected + observed
-    ) %>%
+    ) |>
     dplyr::group_by(
       id_project,
       waterbody,
@@ -327,29 +327,29 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
       survey_year,
       gear_type,
       scientific_name
-    ) %>%
-    dplyr::summarise(catch = sum(catch, na.rm = TRUE)) %>%
+    ) |>
+    dplyr::summarise(catch = sum(catch, na.rm = TRUE)) |>
     dplyr::ungroup()
 
   # create a full survey x species table, which will allow us to fill
   #   unrecorded species with zero values
   survey_table <- fetch_survey_table(project_id, ...)
-  survey_table <- survey_table %>%
+  survey_table <- survey_table |>
     dplyr::left_join(
-      catch %>% dplyr::distinct(id_survey, scientific_name),
+      catch |> dplyr::distinct(id_survey, scientific_name),
       by = "id_survey"
-    ) %>%
-    dplyr::ungroup() %>%
+    ) |>
+    dplyr::ungroup() |>
     tidyr::complete(
       tidyr::nesting(id_project, id_site, id_survey, gear_type, seconds),
       scientific_name
-    ) %>%
+    ) |>
     dplyr::filter(!is.na(scientific_name))
 
   # connect catch data to survey table and calculate CPUE
-  cpue <- survey_table %>%
+  cpue <- survey_table |>
     dplyr::left_join(
-      catch %>%
+      catch |>
         dplyr::distinct(
           id_project,
           waterbody,
@@ -362,12 +362,12 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
           gear_type
         ),
       by = c("id_project", "id_site", "id_survey", "gear_type")
-    ) %>%
-    dplyr::rename(effort_s = seconds) %>%
+    ) |>
+    dplyr::rename(effort_s = seconds) |>
     dplyr::left_join(
-      catch %>% dplyr::select(id_survey, scientific_name, catch),
+      catch |> dplyr::select(id_survey, scientific_name, catch),
       by = c("id_survey", "scientific_name")
-    ) %>%
+    ) |>
     dplyr::mutate(
       catch = ifelse(is.na(catch), 0, catch),
       effort_h = effort_s / 3600,
@@ -375,16 +375,16 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
     )
 
   # tidy this output and add a time stamp
-  cpue <- cpue %>%
+  cpue <- cpue |>
     dplyr::mutate(
       extracted_ts = dplyr::sql("timezone('Australia/Melbourne'::text, now())")
-    ) %>%
-    dplyr::select(dplyr::all_of(cpue_return_cols)) %>%
+    ) |>
+    dplyr::select(dplyr::all_of(cpue_return_cols)) |>
     dplyr::filter(!is.na(scientific_name))
 
   # collect data if required
   if (collect)
-    cpue <- cpue %>% collect()
+    cpue <- cpue |> collect()
 
   # and return
   cpue

@@ -11,59 +11,59 @@ test_that("CPUE is calculated correctly", {
   skip_if(!aaedb_available)
 
   # grab data with CPUE already calculated
-  cpue <- fetch_cpue(2) %>%
+  cpue <- fetch_cpue(2) |>
     filter(
       waterbody == "Campaspe River",
       scientific_name == "Maccullochella peelii"
-    ) %>%
+    ) |>
     collect()
 
   # grab raw data for comparison
-  vefmap <- fetch_project(2) %>%
-    filter(grepl("EF", gear_type)) %>%
+  vefmap <- fetch_project(2) |>
+    filter(grepl("EF", gear_type)) |>
     collect()
 
   # calculate CPUE from raw data
-  effort <- vefmap %>%
-    distinct(id_survey, id_surveyevent, seconds) %>%
-    group_by(id_survey) %>%
+  effort <- vefmap |>
+    distinct(id_survey, id_surveyevent, seconds) |>
+    group_by(id_survey) |>
     summarise(seconds = sum(seconds))
 
-  vefmap_cpue <- vefmap %>%
+  vefmap_cpue <- vefmap |>
     mutate(
       collected = ifelse(is.na(collected), 0, collected),
       observed = ifelse(is.na(observed), 0, observed),
       catch = collected + observed
-    ) %>%
-    group_by(waterbody, id_site, id_survey, scientific_name) %>%
-    summarise(catch = sum(catch, na.rm = TRUE)) %>%
-    ungroup() %>%
-    complete(nesting(waterbody, id_site, id_survey), scientific_name, fill = list(catch = 0)) %>%
-    left_join(effort, by = "id_survey") %>%
+    ) |>
+    group_by(waterbody, id_site, id_survey, scientific_name) |>
+    summarise(catch = sum(catch, na.rm = TRUE)) |>
+    ungroup() |>
+    complete(nesting(waterbody, id_site, id_survey), scientific_name, fill = list(catch = 0)) |>
+    left_join(effort, by = "id_survey") |>
     filter(
       !is.na(seconds),
       seconds > 0,
       !is.na(scientific_name)
-    ) %>%
-    rename(effort_s = seconds) %>%
+    ) |>
+    rename(effort_s = seconds) |>
     mutate(
       effort_h = effort_s / 3600,
       cpue = catch / effort_h
-    ) %>%
+    ) |>
     select(
       waterbody, id_site, id_survey, scientific_name, effort_s, effort_h, cpue
     )
 
   # order cpue and raw-calculated cpue so we can compare
-  cpue <- cpue %>%
-    ungroup() %>%
-    select(all_of(colnames(vefmap_cpue))) %>%
+  cpue <- cpue |>
+    ungroup() |>
+    select(all_of(colnames(vefmap_cpue))) |>
     arrange(waterbody, id_site, id_survey, scientific_name)
-  vefmap_cpue <- vefmap_cpue %>%
+  vefmap_cpue <- vefmap_cpue |>
     filter(
       waterbody == "Campaspe River",
       scientific_name == "Maccullochella peelii"
-    ) %>%
+    ) |>
     arrange(waterbody, id_site, id_survey, scientific_name)
 
   expect_equal(cpue, vefmap_cpue)
@@ -82,8 +82,8 @@ test_that("fetch_table works with basic filters", {
   skip_if(!aaedb_available)
 
   # grab data with CPUE already calculated
-  sites <- fetch_table("site") %>%
-    filter(waterbody == "Campaspe River") %>%
+  sites <- fetch_table("site") |>
+    filter(waterbody == "Campaspe River") |>
     collect()
 
   # test that this has returned something with some values
@@ -116,10 +116,10 @@ test_that("fetch_query works with basic filters", {
   )
 
   # test that a second filter is still applied correctly
-  empty_info <- ovens_info %>% filter(waterbody == "Murray River") %>% collect()
+  empty_info <- ovens_info |> filter(waterbody == "Murray River") |> collect()
 
   # collect the data sets
-  ovens_info <- ovens_info %>% collect()
+  ovens_info <- ovens_info |> collect()
 
   # test that this has returned something with some values
   expect_gt(nrow(ovens_info), 0L)
@@ -143,8 +143,8 @@ test_that("fetch_table works with basic filters", {
   skip_if(!aaedb_available)
 
   # grab data with CPUE already calculated
-  sites <- fetch_table("site") %>%
-    filter(waterbody == "Campaspe River") %>%
+  sites <- fetch_table("site") |>
+    filter(waterbody == "Campaspe River") |>
     collect()
 
   # test that this has returned something with some values
@@ -182,22 +182,22 @@ test_that("fetch_project matches return from the sql view", {
     )
 
     # sort and remove time extracted field
-    value <- value %>%
+    value <- value |>
       arrange(
         id_site, waterbody, site_name, site_desc, id_survey, id_project,
         survey_date, gear_type, id_surveyevent, time_start, condition,
         id_netting, id_sample, id_observation, scientific_name,
         common_name, fork_length_cm, length_cm, collected, observed
-      ) %>%
+      ) |>
       select(-extracted_ts)
-    target <- target %>%
-      select(-id_taxon) %>%
+    target <- target |>
+      select(-id_taxon) |>
       arrange(
         id_site, waterbody, site_name, site_desc, id_survey, id_project,
         survey_date, gear_type, id_surveyevent, time_start, condition,
         id_netting, id_sample, id_observation, scientific_name,
         common_name, fork_length_cm, length_cm, collected, observed
-      ) %>%
+      ) |>
       mutate(
         id_site = as.integer(id_site),
         id_survey = as.integer(id_survey),
@@ -205,7 +205,7 @@ test_that("fetch_project matches return from the sql view", {
         id_observation = as.integer(id_observation),
         id_sample = as.integer(id_sample),
         survey_year = as.numeric(survey_year)
-      ) %>%
+      ) |>
       select(-extracted_ts)
 
     # compare
@@ -232,22 +232,22 @@ test_that("fetch_project matches return from the sql view", {
   target <- do.call(rbind, target)
 
   # sort and remove time extracted field
-  value <- value %>%
+  value <- value |>
     arrange(
       id_site, waterbody, site_name, site_desc, id_survey, id_project,
       survey_date, gear_type, id_surveyevent, time_start, condition,
       id_netting, id_sample, id_observation, scientific_name,
       common_name, fork_length_cm, length_cm, collected, observed
-    ) %>%
+    ) |>
     select(-extracted_ts)
-  target <- target %>%
-    select(-id_taxon) %>%
+  target <- target |>
+    select(-id_taxon) |>
     arrange(
       id_site, waterbody, site_name, site_desc, id_survey, id_project,
       survey_date, gear_type, id_surveyevent, time_start, condition,
       id_netting, id_sample, id_observation, scientific_name,
       common_name, fork_length_cm, length_cm, collected, observed
-    ) %>%
+    ) |>
     mutate(
       id_site = as.integer(id_site),
       id_survey = as.integer(id_survey),
@@ -255,7 +255,7 @@ test_that("fetch_project matches return from the sql view", {
       id_observation = as.integer(id_observation),
       id_sample = as.integer(id_sample),
       survey_year = as.numeric(survey_year)
-    ) %>%
+    ) |>
     select(-extracted_ts)
 
   # compare

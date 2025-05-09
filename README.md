@@ -47,18 +47,18 @@ Queries can be manipulated prior to downloading the data, for example, using dpl
 
 ```
 library(dplyr)
-vefmap <- vefmap %>%
+vefmap <- vefmap |>
   filter(
     grepl("campaspe", waterbody, ignore.case = TRUE),
     scientific_name == "Maccullochella peelii"
-  ) %>%
+  ) |>
   select(
     waterbody, scientific_name, id_site, site_name, seconds, length_cm
   )
   
 # once you're done editing the query, you can download the data set
 #   with the collect() function
-vefmap <- vefmap %>% collect()
+vefmap <- vefmap |> collect()
 ```
 
 
@@ -71,7 +71,7 @@ There is a `fetch_cpue` function that can be used to download pre-calculated CPU
 vefmap_cpue <- fetch_cpue(2)
 
 # filter this down to a single system and species prior to downloading data
-vefmap_cpue <- vefmap_cpue %>%
+vefmap_cpue <- vefmap_cpue |>
   filter(
     grepl("campaspe", waterbody, ignore.case = TRUE),
     scientific_name == "Maccullochella peelii"
@@ -79,7 +79,7 @@ vefmap_cpue <- vefmap_cpue %>%
   
 # once you're done editing the query, you can download the data set
 #   with the collect() function
-vefmap_cpue <- vefmap_cpue %>% collect()
+vefmap_cpue <- vefmap_cpue |> collect()
 ```
 
 
@@ -107,16 +107,16 @@ With the tools in the `sf` package, the site information can be "spatialised" fo
 ```
 # "spatialise" the VEFMAP site information
 library(sf)
-vefmap_site_info <- vefmap_site_info %>%
-  filter(!is.na(geom_pnt)) %>%
+vefmap_site_info <- vefmap_site_info |>
+  filter(!is.na(geom_pnt)) |>
   collect()
-vefmap_sf <- vefmap_site_info %>%
+vefmap_sf <- vefmap_site_info |>
   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
   
 # make a basic map with the `mapview` package
 library(mapview)
-vefmap_sf %>%
-  select(-geom_pnt) %>%
+vefmap_sf |>
+  select(-geom_pnt) |>
   mapview(col.regions = "DarkGreen", label = "site_name", layer.name = "Survey site")
 ```
 
@@ -128,8 +128,8 @@ Alternative functions are `fetch_table`, which return tables by name from the AA
 ```
 # use dplyr tools to download information on all sites in the Ovens River
 site_table <- fetch_table("site", collect = FALSE)
-ovens_sites <- site_table %>%
-  filter(grepl("ovens", waterbody, ignore.case = TRUE)) %>%
+ovens_sites <- site_table |>
+  filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
   collect()
 
 # prepare a simple SQL query to list all projects with data from the
@@ -145,13 +145,13 @@ survey_info <- fetch_query(
 )
 
 # and collect this data set
-survey_info <- survey_info %>% collect()
+survey_info <- survey_info |> collect()
 
 # list all tables in the aquatic_data schema
-list_tables() %>% collect()
+list_tables() |> collect()
 
 # list all tables in the spatial schema
-list_tables(schema = "spatial") %>% collect()
+list_tables(schema = "spatial") |> collect()
 
 # access the help file for list_table to see all available schema
 ?list_tables
