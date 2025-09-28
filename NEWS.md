@@ -1,5 +1,13 @@
 # aae.db (development version)
 
+
+# aae.db 0.1.0.9007
+
+## Fixes
+
+- Remove `fetch_query` option for direct SQL queries
+
+
 # aae.db 0.1.0.9006
 
 ## Features

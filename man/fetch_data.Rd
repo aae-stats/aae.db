@@ -3,15 +3,12 @@
 \name{fetch_data}
 \alias{fetch_data}
 \alias{fetch_table}
-\alias{fetch_query}
 \alias{fetch_project}
 \alias{fetch_cpue}
 \title{Query the AAEDB and return a query object to be manipulated
   and evaluated}
 \usage{
 fetch_table(x, schema = "aquatic_data", collect = FALSE, ...)
-
-fetch_query(query, collect = FALSE, ...)
 
 fetch_project(project_id = NULL, reporting_system = NULL, collect = FALSE, ...)
 
@@ -34,8 +31,6 @@ evaluated lazily (\code{FALSE}, the default)}
 
 \item{\dots}{additional arguments passed to \link[dbplyr]{tbl_sql}}
 
-\item{query}{a character specifying a SQL query}
-
 \item{project_id}{an integer specifying an individual AAE project.
 Any integer values will be accepted but non-existent projects will
 return an empty query. Use \code{list_projects} to see a list of all
@@ -50,13 +45,14 @@ to see a list of all current systems}
 \item{criterion}{\code{list} containing `var`, `lower`, and `upper` elements
 specifying bounds on `var`. Allows complex filtering such as restricting
 CPUE estimates to a specific length or weight range}
+
+\item{query}{a character specifying a SQL query}
 }
 \description{
-\code{fetch_table}, \code{fetch_query}, and
-  \code{fetch_project} represent three ways to interact with the
-  AAEDB. \code{fetch_table} provides access to prepared tables in
-  the database, \code{fetch_query} allows users to compute custom
-  queries, and \code{fetch_project} selects data for an
+\code{fetch_table} and \code{fetch_project}
+  represent two ways to interact with the AAEDB.
+  \code{fetch_table} provides access to prepared tables in
+  the database and \code{fetch_project} selects data for an
   individual AAE project.
 
   All functions require credentials to access the AAEDB, as well
@@ -64,14 +60,6 @@ CPUE estimates to a specific length or weight range}
   it can be easier to connect once to the AAEDB rather than repeatedly
   connecting (and disconnecting). This is possible with the
   \link[aae.db]{aaedb_connect} function.
-
-  \code{fetch_query} can be used to download anything
-  you would download with \code{fetch_table} or \code{fetch_project}.
-  The benefits of \code{fetch_table} and \code{fetch_project} are in
-  providing access to prepared tables containing commonly used variables
-  for analyses of fish data. The benefit of \code{fetch_query} is in
-  allowing custom queries. This may be especially useful when working
-  with large spatial data sets.
 
   Update for version 0.1.0: the \code{fetch_} functions now return an
   unevaluated query rather than a full data table. This allows further
@@ -100,20 +88,7 @@ vefmap <- vefmap |>
 # evaluate this query with collect
 vefmap <- vefmap |> collect()
 
-# process a simple SQL query to list all projects with data from the
-#   Ovens river
-survey_info <- fetch_query(
-  "SELECT waterbody, id_project
-     FROM aquatic_data.site a LEFT JOIN aquatic_data.survey b
-     ON a.id_site = b.id_site
-     WHERE lower(waterbody) LIKE 'ovens\%'
-     GROUP BY waterbody, id_project
-     ORDER by waterbody, id_project",
-  collect = FALSE
-)
-survey_info <- survey_info |> collect()
-
-# process this same query using raw tables from the database
+# process a nested query using raw tables from the database
 #   and `dplyr` methods
 site_data <- fetch_table("site")
 survey_data <- fetch_table("survey")

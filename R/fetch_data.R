@@ -32,11 +32,10 @@
 #'   CPUE estimates to a specific length or weight range
 #' @param \dots additional arguments passed to \link[dbplyr]{tbl_sql}
 #'
-#' @description \code{fetch_table}, \code{fetch_query}, and
-#'   \code{fetch_project} represent three ways to interact with the
-#'   AAEDB. \code{fetch_table} provides access to prepared tables in
-#'   the database, \code{fetch_query} allows users to compute custom
-#'   queries, and \code{fetch_project} selects data for an
+#' @description \code{fetch_table} and \code{fetch_project}
+#'   represent two ways to interact with the AAEDB.
+#'   \code{fetch_table} provides access to prepared tables in
+#'   the database and \code{fetch_project} selects data for an
 #'   individual AAE project.
 #'
 #'   All functions require credentials to access the AAEDB, as well
@@ -44,14 +43,6 @@
 #'   it can be easier to connect once to the AAEDB rather than repeatedly
 #'   connecting (and disconnecting). This is possible with the
 #'   \link[aae.db]{aaedb_connect} function.
-#'
-#'   \code{fetch_query} can be used to download anything
-#'   you would download with \code{fetch_table} or \code{fetch_project}.
-#'   The benefits of \code{fetch_table} and \code{fetch_project} are in
-#'   providing access to prepared tables containing commonly used variables
-#'   for analyses of fish data. The benefit of \code{fetch_query} is in
-#'   allowing custom queries. This may be especially useful when working
-#'   with large spatial data sets.
 #'
 #'   Update for version 0.1.0: the \code{fetch_} functions now return an
 #'   unevaluated query rather than a full data table. This allows further
@@ -80,20 +71,7 @@
 #' # evaluate this query with collect
 #' vefmap <- vefmap |> collect()
 #'
-#' # process a simple SQL query to list all projects with data from the
-#' #   Ovens river
-#' survey_info <- fetch_query(
-#'   "SELECT waterbody, id_project
-#'      FROM aquatic_data.site a LEFT JOIN aquatic_data.survey b
-#'      ON a.id_site = b.id_site
-#'      WHERE lower(waterbody) LIKE 'ovens%'
-#'      GROUP BY waterbody, id_project
-#'      ORDER by waterbody, id_project",
-#'   collect = FALSE
-#' )
-#' survey_info <- survey_info |> collect()
-#'
-#' # process this same query using raw tables from the database
+#' # process a nested query using raw tables from the database
 #' #   and `dplyr` methods
 #' site_data <- fetch_table("site")
 #' survey_data <- fetch_table("survey")
@@ -137,39 +115,6 @@ fetch_table <- function(x, schema = "aquatic_data", collect = FALSE, ...) {
     dbplyr::in_schema(dbplyr::sql(schema), dbplyr::sql(x)),
     ...
   )
-
-  # collect data if required
-  if (collect)
-    out <- out |> collect()
-
-  # return
-  out
-
-}
-
-#' @rdname fetch_data
-#'
-#' @export
-#'
-fetch_query <- function(query, collect = FALSE, ...) {
-
-  # query must be a function or string
-  if (!is.character(query))
-    stop("query must be a SQL query (string)", call. = FALSE)
-
-  # check that the query isn't a vector
-  if (length(query) > 1)
-    stop("SQL query has length > 1 but must be a string", .call = FALSE)
-
-  # connect to database if required
-  new_connection <- connect_if_required("fetch_query", collect = collect)
-
-  # and kick this connection on exit if it's new and the query is executed
-  if (collect & new_connection)
-    on.exit(aaedb_disconnect())
-
-  # grab query, assuming it's a string SQL query
-  out <- dplyr::tbl(DB_ENV$conn, dbplyr::sql(query), ...)
 
   # collect data if required
   if (collect)

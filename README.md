@@ -123,7 +123,7 @@ vefmap_sf |>
 
 ### Advanced methods: interacting directly with tables and SQL queries
 
-Alternative functions are `fetch_table`, which return tables by name from the AAEDB, and `fetch_query`, which returns custom queries specified as an SQL string. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB (see`?list_table` for a list of all available schema).
+An alternative function is `fetch_table`, which return tables by name from the AAEDB. By default, the `fetch_table` function assumes data are in the `aquatic.data` schema (catalogue) but an alternative schema can be specified. The `list_table` function lists all tables in each schema on the AAEDB (see`?list_table` for a list of all available schema).
 
 ```
 # use dplyr tools to download information on all sites in the Ovens River
@@ -131,21 +131,6 @@ site_table <- fetch_table("site", collect = FALSE)
 ovens_sites <- site_table |>
   filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
   collect()
-
-# prepare a simple SQL query to list all projects with data from the
-#   Ovens river
-survey_info <- fetch_query(
-  "SELECT waterbody, id_project
-    FROM aquatic_data.site a LEFT JOIN aquatic_data.survey b
-    ON a.id_site = b.id_site
-    WHERE lower(waterbody) LIKE 'ovens%'
-    GROUP BY waterbody, id_project
-    ORDER by waterbody, id_project",
-  collect = FALSE
-)
-
-# and collect this data set
-survey_info <- survey_info |> collect()
 
 # list all tables in the aquatic_data schema
 list_tables() |> collect()
@@ -166,5 +151,5 @@ list_tables(schema = "spatial") |> collect()
 
 Please leave feedback, bug reports, or feature requests at the GitHub [issues page](https://github.com/aae-stats/aae.db/issues).
 
-Last updated: 24 March 2023 
+Last updated: 28 September 2025 
 
