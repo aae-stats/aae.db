@@ -55,8 +55,8 @@ aaedb_connect()
 # process a basic query on the database (list all site information
 #   for the Ovens River)
 site_table <- fetch_table("site", collect = FALSE)
-ovens_sites <- site_table \%>\%
-  filter(grepl("ovens", waterbody, ignore.case = TRUE)) \%>\%
+ovens_sites <- site_table |>
+  filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
   collect()
 
 # manually disconnect from the AAEDB (not usually required)

@@ -16,14 +16,15 @@
 #' @param schema schema in which \code{x} is found. Defaults to
 #'   \code{"aquatic_data"}
 #' @param query a character specifying a SQL query
-#' @param project_id an integer specifying an individual AAE project
-#'   (1 - Snags, 2 - VEFMAP, 4 - NFRC, 6 - Kiewa Ovens, 7 - SRA,
-#'    8 - Southern Basins, 9 - Ovens Demo Reaches, 10 - King Parrot
-#'    Creek Macquarie Perch, 11 - Lower Goulburn Projects, 12 - Hughes
-#'    Creek Macquarie Perch, 13 - Seven Creeks Macquarie Perch,
-#'    14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
-#'    16 - IVT Broken Creek). Any integer values will be accepted but
-#'    non-existent projects will return an empty query
+#' @param project_id an integer specifying an individual AAE project.
+#'    Any integer values will be accepted but non-existent projects will
+#'    return an empty query. Use \code{list_projects} to see a list of all
+#'    current projects
+#' @param reporting_system a character specifying an individual reporting
+#'    system, which may encompass multiple waterbodies. Reporting systems
+#'    are specified for only a subset of waterbodies; will return an empty
+#'    table if a reporting system is not specified. Use \code{list_systems}
+#'    to see a list of all current systems
 #' @param collect logical: should a query be executed (\code{TRUE}) or
 #'   evaluated lazily (\code{FALSE}, the default)
 #' @param criterion \code{list} containing `var`, `lower`, and `upper` elements
@@ -183,14 +184,20 @@ fetch_query <- function(query, collect = FALSE, ...) {
 #'
 #' @export
 #'
-fetch_project <- function(project_id, collect = FALSE, ...) {
+fetch_project <- function(
+    project_id = NULL, reporting_system = NULL, collect = FALSE, ...
+) {
 
-  # query must be a function or string
-  if (!all((project_id %% 1) == 0)) {
-    stop(
-      "project_id must be an integer or vector of ",
-      "integers (see ?fetch_project for details)",
-      call. = FALSE
+  # one of project_id or reporting_system must be specified
+  if (is.null(project_id) & is.null(reporting_system)) {
+    stop("project_id or reporting_system must be specified", call. = FALSE)
+  }
+
+  # warn if both project_id and reporting_system are specified; default to project
+  if (!is.null(project_id) & !is.null(reporting_system)) {
+    warning(
+      "project_id and reporting_system are both specified;",
+      " returning results for project_id only"
     )
   }
 
@@ -201,10 +208,43 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
   if (collect & new_connection)
     on.exit(aaedb_disconnect())
 
-  # grab survey event table
-  survey_event <- fetch_survey_event(project_id, ...) |>
-    add_electro(...) |>
-    add_netting(...)
+  # grab survey event table from project_id if specified
+  if (!is.null(project_id)) {
+
+    # project_id must be an integer/integer vector
+    if (!all((project_id %% 1) == 0)) {
+      stop(
+        "project_id must be an integer or vector of ",
+        "integers (see ?fetch_project for details)",
+        call. = FALSE
+      )
+    }
+
+    # grab the survey table
+    survey_event <- fetch_survey_event(project_id, ...) |>
+      add_electro(...) |>
+      add_netting(...)
+
+  } else {
+
+    # and grab target systems for all projects otherwise
+    all_projects <- fetch_table("project_lu") |>
+      dplyr::filter(id_project > 0) |>
+      dplyr::distinct(id_project) |>
+      collect() |>
+      dplyr::pull(id_project)
+
+    # work out relevant sites
+    system_table <- fetch_table("site_system") |>
+      dplyr::filter(system %in% !!reporting_system) |>
+      collect()
+
+    # grab data
+    survey_event <- fetch_survey_event(all_projects, ...) |>
+      dplyr::filter(id_site %in% !!system_table$id_site) |>
+      add_electro(...) |>
+      add_netting(...)
+  }
 
   # grab info on collected and observed taxa
   taxon_lu <- fetch_taxon_lu(...)
@@ -247,14 +287,23 @@ fetch_project <- function(project_id, collect = FALSE, ...) {
 #'
 #' @export
 #'
-fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
+fetch_cpue <- function(
+    project_id = NULL,
+    reporting_system = NULL,
+    collect = FALSE,
+    criterion = NULL, ...
+) {
 
-  # query must be a function or string
-  if (!all((project_id %% 1) == 0)) {
-    stop(
-      "project_id must be an integer or vector of ",
-      "integers (see ?fetch_project for details)",
-      call. = FALSE
+  # one of project_id or reporting_system must be specified
+  if (is.null(project_id) & is.null(reporting_system)) {
+    stop("project_id or reporting_system must be specified", call. = FALSE)
+  }
+
+  # warn if both project_id and reporting_system are specified; default to project
+  if (!is.null(project_id) & !is.null(reporting_system)) {
+    warning(
+      "project_id and reporting_system are both specified;",
+      " returning results for project_id only"
     )
   }
 
@@ -265,9 +314,44 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
   if (collect & new_connection)
     on.exit(aaedb_disconnect())
 
-  # grab survey event table
-  survey_event <- fetch_survey_event(project_id, ...) |>
-    add_electro(...)
+  # grab survey event table from project_id if specified
+  if (!is.null(project_id)) {
+
+    # project_id must be an integer/integer_vector
+    if (!all((project_id %% 1) == 0)) {
+      stop(
+        "project_id must be an integer or vector of ",
+        "integers (see ?fetch_project for details)",
+        call. = FALSE
+      )
+    }
+
+    # grab survey table
+    survey_event <- fetch_survey_event(project_id, ...) |>
+      add_electro(...) |>
+      add_netting(...)
+
+  } else {
+
+    # and grab target reporting_system for all projects otherwise
+    all_projects <- fetch_table("project_lu") |>
+      dplyr::filter(id_project > 0) |>
+      dplyr::distinct(id_project) |>
+      collect() |>
+      dplyr::pull(id_project)
+
+    # work out relevant sites
+    system_table <- fetch_table("site_system") |>
+      dplyr::filter(system %in% !!reporting_system) |>
+      collect()
+
+    # grab data
+    survey_event <- fetch_survey_event(all_projects, ...) |>
+      dplyr::filter(id_site %in% !!system_table$id_site) |>
+      add_electro(...) |>
+      add_netting(...)
+
+  }
 
   # grab info on collected and observed taxa
   taxon_lu <- fetch_taxon_lu(...)
@@ -275,7 +359,7 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
   taxa_observed <- fetch_observed(survey_event, taxon_lu, taxa_collected, ...)
   taxa_all <- taxa_collected |> dplyr::union_all(taxa_observed)
 
-  # combine everything into a single table and keep only EF surveys
+  # combine everything into a single table and keep all gears
   survey_event <- survey_event |>
     dplyr::left_join(
       taxa_all |> dplyr::select(
@@ -289,10 +373,7 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
       ),
       by = "id_surveyevent"
     ) |>
-    dplyr::filter(
-      grepl(!!"EF", gear_type),
-      condition == !!"FISHABLE"
-    ) |>
+    dplyr::filter(condition == !!"FISHABLE") |>
     dplyr::select(-time_start, -time_finish, -condition)
 
   # apply criterion if needed (allows setting a subset of rows to zero
@@ -333,7 +414,21 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
 
   # create a full survey x species table, which will allow us to fill
   #   unrecorded species with zero values
-  survey_table <- fetch_survey_table(project_id, ...)
+  if (!is.null(project_id)) {
+
+    # grab with project_id if available
+    survey_table <- fetch_survey_table(project_id, ...)
+
+  } else {
+
+    # otherwise use the specified reporting system
+    #  (all_projects and system_table are defined above)
+    survey_table <- fetch_survey_table(all_projects, ...) |>
+      dplyr::filter(id_site %in% !!system_table$id_site)
+
+  }
+
+  # expand survey table
   survey_table <- survey_table |>
     dplyr::left_join(
       catch |> dplyr::distinct(id_survey, scientific_name),
@@ -341,7 +436,10 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
     ) |>
     dplyr::ungroup() |>
     tidyr::complete(
-      tidyr::nesting(id_project, id_site, id_survey, gear_type, seconds),
+      tidyr::nesting(
+        id_project, id_site, id_survey, gear_type,
+        seconds, soak_minutes, gear_count
+      ),
       scientific_name
     ) |>
     dplyr::filter(!is.na(scientific_name))
@@ -363,7 +461,11 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
         ),
       by = c("id_project", "id_site", "id_survey", "gear_type")
     ) |>
-    dplyr::rename(effort_s = seconds) |>
+    dplyr::rename(
+      effort_s = seconds,
+      effort_soak_minutes = soak_minutes,
+      effort_gear_count = gear_count
+    ) |>
     dplyr::left_join(
       catch |> dplyr::select(id_survey, scientific_name, catch),
       by = c("id_survey", "scientific_name")
@@ -390,26 +492,6 @@ fetch_cpue <- function(project_id, collect = FALSE, criterion = NULL, ...) {
   cpue
 
 }
-
-# internal list of project names by id
-source_project_name <- c(
-  "Snags",
-  "VEFMAP",
-  NA,
-  "NFRC",
-  NA,
-  "Kiewa Ovens",
-  "SRA",
-  "Southern Basins",
-  "Ovens Demo Reaches",
-  "King Parrot Creek Macquarie Perch",
-  "Lower Goulburn Projects",
-  "Hughes Creek Macquarie Perch",
-  "Seven Creeks Macquarie Perch",
-  "Index of Estuarine Condition",
-  "LTIM Lower Goulburn",
-  "IVT Broken Creek"
-)
 
 # internal list of variables to be returned from database for individual records
 survey_event_return_cols <- c(
@@ -455,6 +537,8 @@ cpue_return_cols <- c(
   "gear_type",
   "effort_s",
   "effort_h",
+  "effort_soak_minutes",
+  "effort_gear_count",
   "scientific_name",
   "catch",
   "cpue",

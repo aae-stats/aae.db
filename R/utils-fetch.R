@@ -149,14 +149,13 @@ fetch_survey_table <- function(project_id, ...) {
       by = "id_survey"
     )
 
-  # add electro information (seconds power on)
-  survey_table <- survey_table |> add_electro(...)
+  # add electro information (seconds power on) and netting info (gear_count)
+  survey_table <- survey_table |> add_electro(...) |> add_netting(...)
 
   # filter to surveys that actually collected data
   survey_table <- survey_table |>
     dplyr::filter(
       id_project %in% project_id,
-      grepl(!!"EF", gear_type),
       released,
       condition == !!"FISHABLE"
     ) |>
@@ -165,7 +164,11 @@ fetch_survey_table <- function(project_id, ...) {
   # calculate total electro seconds for each survey (sum over survey events)
   survey_table <- survey_table |>
     dplyr::group_by(id_project, id_site, id_survey, gear_type, sdate) |>
-    dplyr::summarise(seconds = sum(seconds, na.rm = TRUE))
+    dplyr::summarise(
+      seconds = sum(seconds, na.rm = TRUE),
+      soak_minutes = sum(soak_minutes_per_unit, na.rm = TRUE),
+      gear_count = sum(gear_count, na.rm = TRUE)
+    )
 
   # cast 64-bit ints to 32-bit, drop dodgy projects or seconds estimates,
   #   and return an ordered result
@@ -174,9 +177,14 @@ fetch_survey_table <- function(project_id, ...) {
       id_project = as.integer(id_project),
       id_site = as.integer(id_site),
       id_survey = as.integer(id_survey),
-      seconds = as.integer(seconds)
+      seconds = as.integer(seconds),
+      soak_minutes = as.integer(soak_minutes),
+      gear_count = as.integer(gear_count)
     ) |>
-    dplyr::filter(!is.na(seconds), seconds > 0, id_project != -99)
+    dplyr::filter(
+      seconds > 0 | soak_minutes > 0 | gear_count > 0,
+      id_project > 0
+    )
 
   # return unevaluated query
   survey_table

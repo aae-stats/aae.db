@@ -40,6 +40,11 @@
 #' @rdname list_tables
 list_tables <- function(schema = "aquatic_data", ..., collect = FALSE) {
 
+  available_schema <- fetch_table("tables", schema = "information_schema") |>
+    dplyr::distinct(table_schema) |>
+    collect() |>
+    dplyr::pull(table_schema)
+
   # check that schema is in the viewable list
   if (!schema %in% available_schema) {
     stop(
@@ -50,12 +55,11 @@ list_tables <- function(schema = "aquatic_data", ..., collect = FALSE) {
     )
   }
 
-
   # list all the tables in the requested schema, sorted by table_type
   table <- fetch_table("tables", schema = "information_schema", ...) |>
-    filter(table_schema == !!schema) |>
-    select(table_catalog, table_schema, table_name, table_type) |>
-    arrange(table_type)
+    dplyr::filter(table_schema == !!schema) |>
+    dplyr::select(table_catalog, table_schema, table_name, table_type) |>
+    dplyr::arrange(table_type)
 
   # collect if required
   if (collect)
@@ -66,13 +70,54 @@ list_tables <- function(schema = "aquatic_data", ..., collect = FALSE) {
 
 }
 
-# list of available schema (excluding sandboxes)
-available_schema <- c(
-  "aquatic_data",
-  "public",
-  "projects",
-  "edna",
-  "spatial",
-  "spatial_isc",
-  "stream_network"
-)
+#' @rdname list_tables
+#'
+#' @export
+#'
+list_projects <- function(..., collect = FALSE) {
+
+  # list all the tables in the requested schema, sorted by table_type
+  table <- fetch_table("project_lu", ...) |>
+    dplyr::filter(id_project > 0) |>
+    dplyr::select(
+      id_project,
+      project_name,
+      other_names,
+      contacts,
+      joint_data,
+      other_id_project
+    ) |>
+    dplyr::arrange(id_project)
+
+  # collect if required
+  if (collect)
+    table <- table |> collect()
+
+  # return
+  table
+
+}
+
+#' @rdname list_tables
+#'
+#' @export
+#'
+list_systems <- function(..., collect = FALSE) {
+
+  # list all the tables in the requested schema, sorted by table_type
+  table <- fetch_table("site_system", ...) |>
+    left_join(
+      fetch_table("site") |> select(id_site, waterbody),
+      by = "id_site"
+    ) |>
+    distinct(system, waterbody) |>
+    arrange(system, waterbody)
+
+  # collect if required
+  if (collect)
+    table <- table |> collect()
+
+  # return
+  table
+
+}

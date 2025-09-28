@@ -13,9 +13,15 @@ fetch_table(x, schema = "aquatic_data", collect = FALSE, ...)
 
 fetch_query(query, collect = FALSE, ...)
 
-fetch_project(project_id, collect = FALSE, ...)
+fetch_project(project_id = NULL, reporting_system = NULL, collect = FALSE, ...)
 
-fetch_cpue(project_id, collect = FALSE, criterion = NULL, ...)
+fetch_cpue(
+  project_id = NULL,
+  reporting_system = NULL,
+  collect = FALSE,
+  criterion = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
@@ -30,14 +36,16 @@ evaluated lazily (\code{FALSE}, the default)}
 
 \item{query}{a character specifying a SQL query}
 
-\item{project_id}{an integer specifying an individual AAE project
-(1 - Snags, 2 - VEFMAP, 4 - NFRC, 6 - Kiewa Ovens, 7 - SRA,
- 8 - Southern Basins, 9 - Ovens Demo Reaches, 10 - King Parrot
- Creek Macquarie Perch, 11 - Lower Goulburn Projects, 12 - Hughes
- Creek Macquarie Perch, 13 - Seven Creeks Macquarie Perch,
- 14 - Index of Estuarine Condition, 15 - LTIM Lower Goulburn,
- 16 - IVT Broken Creek). Any integer values will be accepted but
- non-existent projects will return an empty query}
+\item{project_id}{an integer specifying an individual AAE project.
+Any integer values will be accepted but non-existent projects will
+return an empty query. Use \code{list_projects} to see a list of all
+current projects}
+
+\item{reporting_system}{a character specifying an individual reporting
+system, which may encompass multiple waterbodies. Reporting systems
+are specified for only a subset of waterbodies; will return an empty
+table if a reporting system is not specified. Use \code{list_systems}
+to see a list of all current systems}
 
 \item{criterion}{\code{list} containing `var`, `lower`, and `upper` elements
 specifying bounds on `var`. Allows complex filtering such as restricting
@@ -83,14 +91,14 @@ library(dplyr)
 vefmap <- fetch_project(2)
 
 # can manipulate and filter this query with dplyr methods
-vefmap <- vefmap \%>\%
+vefmap <- vefmap |>
   filter(
     waterbody == "Campaspe River",
     scientific_name == "Maccullochella peelii"
   )
 
 # evaluate this query with collect
-vefmap <- vefmap \%>\% collect()
+vefmap <- vefmap |> collect()
 
 # process a simple SQL query to list all projects with data from the
 #   Ovens river
@@ -103,30 +111,30 @@ survey_info <- fetch_query(
      ORDER by waterbody, id_project",
   collect = FALSE
 )
-survey_info <- survey_info \%>\% collect()
+survey_info <- survey_info |> collect()
 
 # process this same query using raw tables from the database
 #   and `dplyr` methods
 site_data <- fetch_table("site")
 survey_data <- fetch_table("survey")
-survey_info_dplyr <- site_data \%>\%
+survey_info_dplyr <- site_data |>
   left_join(
-    survey_data \%>\% distinct(id_site, id_project),
+    survey_data |> distinct(id_site, id_project),
     by = "id_site"
-  ) \%>\%
-  filter(grepl("ovens", waterbody, ignore.case = TRUE)) \%>\%
-  distinct(waterbody, id_project) \%>\%
-  arrange(waterbody, id_project) \%>\%
+  ) |>
+  filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
+  distinct(waterbody, id_project) |>
+  arrange(waterbody, id_project) |>
   collect()
 
 # and grab information for individual projects
 ovens_data <- fetch_project(9)
-ovens_data <- ovens_data \%>\% collect()
+ovens_data <- ovens_data |> collect()
 
 # subset this to 2015-2017 surveys
 ovens_data <- fetch_project(9)
-ovens_data <- ovens_data \%>\%
-  filter(survey_year \%in\% c(2015:2017)) \%>\%
+ovens_data <- ovens_data |>
+  filter(survey_year \%in\% c(2015:2017)) |>
   collect()
 
 # optional: disconnect from the AAEDB prior to ending the R session

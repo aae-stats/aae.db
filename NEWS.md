@@ -1,11 +1,28 @@
 # aae.db (development version)
 
+# aae.db 0.1.0.9006
+
+## Features
+
+- Use extended reach look-up table
+- Add system filter option to `fetch_project` and `fetch_cpue`
+- Include all gear types in `fetch_cpue`
+- Add `list_systems` and `list_projects` functions
+
+## Fixes
+
+- Fix bug in coordinate calculation in `fetch_site_info`
+
+
 # aae.db 0.1.0.9005
 
 ## Features
 
-- Fix reach look-up table
 - Replace `%>%` with `|>` throughout
+
+## Fixes
+
+- Fix bug in reach look-up table
 
 
 # aae.db 0.1.0.9004

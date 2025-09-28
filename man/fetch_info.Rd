@@ -43,30 +43,30 @@ library(dplyr)
 vefmap <- fetch_project(2)
 
 # can manipulate and filter this query with dplyr methods
-vefmap <- vefmap \%>\%
+vefmap <- vefmap |>
   filter(
     waterbody == "Campaspe River",
     scientific_name == "Maccullochella peelii"
   )
 
 # evaluate this query with collect
-vefmap <- vefmap \%>\% collect()
+vefmap <- vefmap |> collect()
 
 # fetch information on the sites in a data set
 vefmap_site_info <- fetch_site_info(vefmap)
 
 # "spatialise" this information with the `sf` package
 library(sf)
-vefmap_site_info <- vefmap_site_info \%>\%
-  filter(!is.na(geom_pnt)) \%>\%
+vefmap_site_info <- vefmap_site_info |>
+  filter(!is.na(geom_pnt)) |>
   collect()
-vefmap_sf <- vefmap_site_info \%>\%
+vefmap_sf <- vefmap_site_info |>
   st_set_geometry(st_as_sfc(vefmap_site_info$geom_pnt))
 
 # and make a basic map with the `mapview` package
 library(mapview)
-vefmap_sf \%>\%
-  select(-geom_pnt) \%>\%
+vefmap_sf |>
+  select(-geom_pnt) |>
   mapview(
     col.regions = "DarkGreen",
     label = "site_name",
@@ -87,17 +87,17 @@ fetch_species_info(vefmap)
 fetch_species_info(pattern = "Maccull", ignore.case = TRUE)
 
 # list all taxonomic groups for use in fetch_species_info
-fetch_table("taxon_lu", collect = FALSE) \%>\%
-  select(taxon_type) \%>\%
-  collect() \%>\%
-  pull(taxon_type) \%>\%
+fetch_table("taxon_lu", collect = FALSE) |>
+  select(taxon_type) |>
+  collect() |>
+  pull(taxon_type) |>
   unique()
 
 # or list all primary disciplines for use in fetch_species_info
-fetch_table("taxon_lu", collect = FALSE) \%>\%
-  select(primary_discipline) \%>\%
-  collect() \%>\%
-  pull(primary_discipline) \%>\%
+fetch_table("taxon_lu", collect = FALSE) |>
+  select(primary_discipline) |>
+  collect() |>
+  pull(primary_discipline) |>
   unique()
 
 # and download data for one group (setting primary_discipline to NULL

@@ -2,9 +2,15 @@
 % Please edit documentation in R/list_tables.R
 \name{list_tables}
 \alias{list_tables}
+\alias{list_projects}
+\alias{list_systems}
 \title{List available tables in the AAEDB}
 \usage{
 list_tables(schema = "aquatic_data", ..., collect = FALSE)
+
+list_projects(..., collect = FALSE)
+
+list_systems(..., collect = FALSE)
 }
 \arguments{
 \item{schema}{the schema from which to list tables, defaults to
@@ -31,10 +37,10 @@ aaedb_connect()
 library(dplyr)
 
 # list all tables in the aquatic_data schema
-list_tables() \%>\% collect()
+list_tables() |> collect()
 
 # list all tables in the spatial schema
-list_tables(schema = "spatial") \%>\% collect()
+list_tables(schema = "spatial") |> collect()
 
 # optional: disconnect from the AAEDB prior to ending the R session
 #   when all queries and evaluation is complete

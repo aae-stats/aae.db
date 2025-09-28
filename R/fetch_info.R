@@ -113,16 +113,16 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
   # grab coords for all sites
   site_info <- fetch_table("site") |>
     dplyr::select(id_site, waterbody, geom_pnt) |>
-    dplyr::mutate(
-      longitude = st_x(geom_pnt),
-      latitude = st_y(geom_pnt)
-    ) |>
     dplyr::left_join(
       fetch_table("site_project_lu") |>
         dplyr::select(id_site, site_name, id_project),
       by = "id_site"
     ) |>
-    dplyr::left_join(fetch_table("reach_lu"), by = "id_site")
+    dplyr::left_join(
+      fetch_table("v_project_reach_zones_site_id", "projects") |>
+        select(id_site, reach_id, sub_reach_id, cma),
+      by = "id_site"
+    )
 
   # filter based on columns of x if provided
   if (!is.null(x)) {
@@ -132,7 +132,8 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
 
     # pull out main columns of x and collect if it's an unevaluated query
     target_cols <- c(
-      "waterbody", "reach_no", "id_site", "site_name", "id_project"
+      "waterbody", "reach_id", "sub_reach_id",
+      "id_site", "site_name", "id_project"
     )
     available_targets <- xcol[xcol %in% target_cols]
     xval <- x |> dplyr::select(dplyr::all_of(available_targets))
@@ -194,7 +195,8 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
     dplyr::select(
       id_project,
       waterbody,
-      reach_no,
+      reach_id,
+      sub_reach_id,
       id_site,
       site_name,
       geom_pnt,
@@ -223,11 +225,11 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
   # grab coords for all sites
   site_info <- fetch_table("site") |>
     dplyr::select(waterbody, id_site, site_name, geom_pnt) |>
-    dplyr::mutate(
-      longitude = st_x(geom_pnt),
-      latitude = st_y(geom_pnt)
-    ) |>
-    dplyr::left_join(fetch_table("reach_lu"), by = "id_site")
+    dplyr::left_join(
+      fetch_table("v_project_reach_zones_site_id", "projects") |>
+        select(id_site, reach_id, sub_reach_id, cma),
+      by = "id_site"
+    )
   survey_info <- fetch_survey_table(seq_len(20)) |>
     dplyr::left_join(site_info, by = "id_site")
 
@@ -238,7 +240,8 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     xcol <- colnames(x)
 
     # pull out main columns of x and collect if it's an unevaluated query
-    target_cols <- c("waterbody", "reach_no", "id_site", "id_project", "id_survey")
+    target_cols <- c("waterbody", "reach_id", "sub_reach_id",
+                     "id_site", "id_project", "id_survey")
     available_targets <- xcol[xcol %in% target_cols]
     xval <- x |> dplyr::select(dplyr::all_of(available_targets))
     if ("tbl_PqConnection" %in% class(x))
@@ -299,7 +302,8 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     dplyr::select(
       id_project,
       waterbody,
-      reach_no,
+      reach_id,
+      sub_reach_id,
       id_site,
       site_name,
       sdate,
