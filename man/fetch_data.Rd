@@ -45,8 +45,6 @@ to see a list of all current systems}
 \item{criterion}{\code{list} containing `var`, `lower`, and `upper` elements
 specifying bounds on `var`. Allows complex filtering such as restricting
 CPUE estimates to a specific length or weight range}
-
-\item{query}{a character specifying a SQL query}
 }
 \description{
 \code{fetch_table} and \code{fetch_project}

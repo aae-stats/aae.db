@@ -15,7 +15,6 @@
 #' @param x a character specifying an individual table in the AAEDB
 #' @param schema schema in which \code{x} is found. Defaults to
 #'   \code{"aquatic_data"}
-#' @param query a character specifying a SQL query
 #' @param project_id an integer specifying an individual AAE project.
 #'    Any integer values will be accepted but non-existent projects will
 #'    return an empty query. Use \code{list_projects} to see a list of all
