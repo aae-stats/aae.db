@@ -199,9 +199,7 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
       sub_reach_id,
       id_site,
       site_name,
-      geom_pnt,
-      latitude,
-      longitude
+      geom_pnt
     )
 
   # return
