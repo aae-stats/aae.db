@@ -5,6 +5,7 @@
 \alias{fetch_table}
 \alias{fetch_project}
 \alias{fetch_cpue}
+\alias{calculate_cpue}
 \title{Query the AAEDB and return a query object to be manipulated
   and evaluated}
 \usage{
@@ -19,6 +20,8 @@ fetch_cpue(
   criterion = NULL,
   ...
 )
+
+calculate_cpue(x = NULL, collect = FALSE, ...)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}

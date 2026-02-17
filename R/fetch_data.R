@@ -7,7 +7,7 @@
 #'
 #' @importFrom dplyr all_of distinct filter full_join group_by
 #'   inner_join left_join mutate rename select summarise tbl
-#'   ungroup union_all
+#'   ungroup union_all pull
 #' @importFrom dbplyr in_schema sql
 #' @importFrom tidyr complete nesting
 #' @importFrom rlang `!!` sym
@@ -163,6 +163,15 @@ fetch_project <- function(
         call. = FALSE
       )
     }
+
+    # look up extra projects that provide data for the target project
+    project_id <- fetch_table("project_lu") |>
+      dplyr::filter(id_project %in% !!project_id) |>
+      dplyr::mutate(id = paste(id_project, other_id_project, sep = ",")) |>
+      dplyr::pull(id)
+    project_id <- textConnection(project_id) |>
+      scan(sep = ",", quiet = TRUE) |>
+      unique()
 
     # grab the survey table
     survey_event <- fetch_survey_event(project_id, ...) |>
@@ -357,7 +366,7 @@ fetch_cpue <- function(
     dplyr::ungroup()
 
   # create a full survey x species table, which will allow us to fill
-  #   unrecorded species with zero values
+  #   unrecorded species with zero valuesc
   if (!is.null(project_id)) {
 
     # grab with project_id if available
@@ -415,6 +424,130 @@ fetch_cpue <- function(
       by = c("id_survey", "scientific_name")
     ) |>
     dplyr::mutate(
+      catch = ifelse(is.na(catch), 0, catch),
+      effort_h = effort_s / 3600,
+      cpue = catch / effort_h
+    )
+
+  # tidy this output and add a time stamp
+  cpue <- cpue |>
+    dplyr::mutate(
+      extracted_ts = dplyr::sql("timezone('Australia/Melbourne'::text, now())")
+    ) |>
+    dplyr::select(dplyr::all_of(cpue_return_cols)) |>
+    dplyr::filter(!is.na(scientific_name))
+
+  # collect data if required
+  if (collect)
+    cpue <- cpue |> collect()
+
+  # and return
+  cpue
+
+}
+
+#' @rdname fetch_data
+#'
+#' @export
+#'
+calculate_cpue <- function(
+    x = NULL,
+    collect = FALSE,
+    ...
+) {
+
+  # check x is OK for use
+  x_ok <- is.null(x) |
+    inherits(x, "tbl_PqConnection") |
+    inherits(x, "data.frame")
+  if (!x_ok)
+    stop("x must be an unevaluated query or tbl/data.frame", call. = FALSE)
+
+  # pull out unique project ids
+  if ("tbl_PqConnection" %in% class(x)) {
+    project_id <- x |>
+      dplyr::select(id_project) |>
+      collect() |>
+      dplyr::pull(id_project) |>
+      unique()
+    # waterbody_id <- x |>
+    #   dplyr::distinct(waterbody) |>
+    #   collect () |>
+    #   dplyr::pull(waterbody)
+  } else {
+    project_id <- unique(x$id_project)
+    # waterbody_id <- unique(x$waterbody)
+  }
+
+  # calculate total catch per survey
+  catch <- x |>
+    dplyr::mutate(
+      collected = ifelse(is.na(collected), 0, collected),
+      observed = ifelse(is.na(observed), 0, observed),
+      catch = collected + observed
+    ) |>
+    dplyr::group_by(
+      id_project,
+      waterbody,
+      id_site,
+      site_name,
+      site_desc,
+      id_survey,
+      survey_date,
+      survey_year,
+      gear_type,
+      scientific_name
+    ) |>
+    dplyr::summarise(catch = sum(catch, na.rm = TRUE)) |>
+    dplyr::ungroup()
+
+  # create a full survey x species table, which will allow us to fill
+  #   unrecorded species with zero values
+  survey_table <- fetch_survey_table(project_id, ...) |>
+    dplyr::left_join(
+      fetch_table("site") |>
+        dplyr::select(id_site, waterbody, site_name, site_desc),
+      by = "id_site"
+    )# |>
+    # filter(waterbody %in% !!waterbody_id)
+
+  # collect the survey table if x is a data.frame/tibble, to
+  #   allow joins below
+  if (!"tbl_PqConnection" %in% class(x)) {
+    survey_table <- survey_table |> collect()
+  }
+
+  # expand survey table
+  survey_table <- survey_table |>
+    dplyr::left_join(
+      catch |> dplyr::distinct(id_survey, scientific_name),
+      by = "id_survey"
+    ) |>
+    dplyr::ungroup() |>
+    tidyr::complete(
+      tidyr::nesting(
+        id_project, id_site, id_survey, waterbody, site_name, site_desc,
+        sdate, gear_type,
+        seconds, soak_minutes, gear_count
+      ),
+      scientific_name
+    ) |>
+    dplyr::filter(!is.na(scientific_name))
+
+  # connect catch data to survey table and calculate CPUE
+  cpue <- survey_table |>
+    dplyr::rename(
+      survey_date = sdate,
+      effort_s = seconds,
+      effort_soak_minutes = soak_minutes,
+      effort_gear_count = gear_count
+    ) |>
+    dplyr::left_join(
+      catch |> dplyr::select(id_survey, scientific_name, catch),
+      by = c("id_survey", "scientific_name")
+    ) |>
+    dplyr::mutate(
+      survey_year = year(survey_date),
       catch = ifelse(is.na(catch), 0, catch),
       effort_h = effort_s / 3600,
       cpue = catch / effort_h
