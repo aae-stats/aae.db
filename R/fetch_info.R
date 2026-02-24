@@ -306,8 +306,6 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
       site_name,
       sdate,
       geom_pnt,
-      latitude,
-      longitude,
       id_survey,
       gear_type,
       seconds

@@ -12,7 +12,7 @@ fetch_survey_event <- function(project_id, ...) {
     dplyr::inner_join(
       fetch_table("survey", ...) |>
         dplyr::select(
-          id_site, id_survey, id_project, sdate, gear_type, released
+          id_site, id_survey, id_project, sdate, gear_type, released, regime
         ),
       by = "id_site"
     ) |>
@@ -35,7 +35,8 @@ fetch_survey_event <- function(project_id, ...) {
     ) |>
     dplyr::filter(
       id_project %in% project_id,
-      released
+      released,
+      condition == !!"FISHABLE"
     ) |>
     dplyr::mutate(
       id_site = as.integer(id_site),
@@ -140,7 +141,9 @@ fetch_survey_table <- function(project_id, ...) {
     dplyr::select(id_site) |>
     dplyr::left_join(
       fetch_table("survey", ...) |>
-        dplyr::select(id_site, id_survey, id_project, gear_type, sdate, released),
+        dplyr::select(
+          id_site, id_survey, id_project, gear_type, sdate, released, regime
+        ),
       by = "id_site"
     ) |>
     dplyr::left_join(
@@ -161,14 +164,24 @@ fetch_survey_table <- function(project_id, ...) {
     ) |>
     dplyr::select(-released, -condition)
 
+  # filter out rows without any effort information
+  #  (suggests record missing from electro or netting table)
+  survey_table <- survey_table |>
+    filter(
+      !((is.na(soak_minutes_per_unit) | is.na(gear_count)) &
+          is.na(seconds))
+    )
+
   # calculate total electro seconds for each survey (sum over survey events)
   survey_table <- survey_table |>
-    dplyr::group_by(id_project, id_site, id_survey, gear_type, sdate) |>
+    dplyr::group_by(id_project, id_site, id_survey, gear_type, regime) |>
     dplyr::summarise(
+      sdate = min(sdate, na.rm = TRUE),
       seconds = sum(seconds, na.rm = TRUE),
-      soak_minutes = sum(soak_minutes_per_unit, na.rm = TRUE),
+      soak_minutes = sum(soak_minutes_per_unit * gear_count, na.rm = TRUE),
       gear_count = sum(gear_count, na.rm = TRUE)
-    )
+    ) |>
+    dplyr::ungroup()
 
   # cast 64-bit ints to 32-bit, drop dodgy projects or seconds estimates,
   #   and return an ordered result

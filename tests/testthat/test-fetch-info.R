@@ -69,7 +69,10 @@ test_that("fetch_info functions return matches to a table", {
 
   # fetch information on the species in a data set
   vefmap_species_info <- fetch_species_info(vefmap) |> collect()
-  expect_equal(unique(vefmap_species_info$scientific_name), "Maccullochella peelii")
+  expect_equal(
+    unique(vefmap_species_info$scientific_name),
+    "Maccullochella peelii"
+  )
   expect_gt(nrow(vefmap_species_info), 0L)
 
 })
