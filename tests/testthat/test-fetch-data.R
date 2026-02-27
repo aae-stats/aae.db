@@ -495,30 +495,6 @@ test_that("fetch_table works with basic filters", {
 
 })
 
-test_that("fetch_table works with basic filters", {
-
-  skip_if_offline()
-  skip_on_cran()
-  skip_on_ci()
-
-  # check if we can connect to the database
-  aaedb_connect()
-  aaedb_available <- check_aaedb_connection()
-  skip_if(!aaedb_available)
-
-  # grab data with CPUE already calculated
-  sites <- fetch_table("site") |>
-    filter(waterbody == "Campaspe River") |>
-    collect()
-
-  # test that this has returned something with some values
-  expect_gt(nrow(sites), 0L)
-
-  # and should only include Camaspe River in the waterbody field
-  expect_equal(unique(sites$waterbody), "Campaspe River")
-
-})
-
 test_that("fetch_project matches return from the sql view", {
 
   skip_if_offline()
@@ -688,5 +664,91 @@ test_that("fetch_project and fetch_survey_table return the same surveys", {
   #    0 effort surveys)
   expect_equal(nrow(matched), 0L)
   expect_gt(nrow(mismatched), 0L)
+
+})
+
+test_that("fetch_birds works with basic filters on queries or direct", {
+
+  skip_if_offline()
+  skip_on_cran()
+  skip_on_ci()
+
+  # check if we can connect to the database
+  aaedb_connect()
+  aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
+
+  # download bird data for one site
+  value <- fetch_birds(icon_site = "Barmah System", type = "woodland birds")
+
+  # try a query version of the same filter
+  target <- fetch_birds() |>
+    filter(
+      system == "Barmah System",
+      type_desc == "woodland birds"
+    )
+
+  # rearrange
+  value <- value |>
+    collect() |>
+    arrange(id_survey, id_surveyevent, scientific_name) |>
+    select(-extracted_ts)
+  target <- target |>
+    collect() |>
+    arrange(id_survey, id_surveyevent, scientific_name) |>
+    select(-extracted_ts)
+
+  # test
+  expect_equal(value, target)
+
+})
+
+test_that("fetch_birds returns data for all icon sites", {
+
+  skip_if_offline()
+  skip_on_cran()
+  skip_on_ci()
+
+  # check if we can connect to the database
+  aaedb_connect()
+  aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
+
+  # check each Icon Site in turn
+  sys_set <- c(
+    "Barmah System",
+    "CLLMM System",
+    "Gunbower System",
+    "Hattah Kulkyne System",
+    "Lindsay Mulcra System",
+    "Millewa System",
+    "Wallpolla System"
+  )
+  for (i in seq_along(sys_set)) {
+
+    # woodland birds only exist for some sites
+    if (grepl("Barmah|Hattah|Millewa", sys_set[i])) {
+
+      # download bird data for each site for woodland birds
+      value <- fetch_birds(
+        icon_site = sys_set[i], type = "woodland birds", collect = TRUE
+      )
+
+      # check something is return and it is just the single system
+      expect_gt(nrow(value), 0)
+      expect_equal(unique(value$system), sys_set[i])
+
+    }
+
+    # repeat for waterbirds
+    value <- fetch_birds(
+      icon_site = sys_set[i], type = "waterbirds", collect = TRUE
+    )
+
+    # check something is return and it is just the single system
+    expect_gt(nrow(value), 0)
+    expect_equal(unique(value$system), sys_set[i])
+
+  }
 
 })

@@ -5,6 +5,7 @@
 \alias{fetch_site_info}
 \alias{fetch_survey_info}
 \alias{fetch_species_info}
+\alias{fetch_habitat_info}
 \title{Extract information on sites or species represented in the AAEDB}
 \usage{
 fetch_site_info(x = NULL, ..., collect = FALSE)
@@ -12,6 +13,8 @@ fetch_site_info(x = NULL, ..., collect = FALSE)
 fetch_survey_info(x = NULL, ..., collect = FALSE)
 
 fetch_species_info(x = NULL, ..., collect = FALSE)
+
+fetch_habitat_info(x = NULL, ..., collect = FALSE)
 }
 \arguments{
 \item{x}{an evaluated or unevaluated query (table) for which to extract

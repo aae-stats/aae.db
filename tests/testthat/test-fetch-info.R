@@ -125,3 +125,75 @@ test_that("fetch_info functions return matches to a regex pattern", {
   expect_equal(vefmap_species_info1, vefmap_species_info2)
 
 })
+
+test_that("fetch_info functions work with birds data", {
+
+  skip_if_offline()
+  skip_on_cran()
+  skip_on_ci()
+
+  # check if we can connect to the database
+  aaedb_connect()
+  aaedb_available <- check_aaedb_connection()
+  skip_if(!aaedb_available)
+
+  # download bird data for one site
+  value <- fetch_birds(icon_site = "Barmah System", type = "woodland birds")
+
+  # test fetch_site_info function on a query
+  target1 <- value |> fetch_site_info() |> collect()
+
+  # and on a collected data set
+  target2 <- value |> collect() |> fetch_site_info() |> collect()
+
+  # rearrange to match the two forms
+  target1 <- target1 |> arrange(id_site)
+  target2 <- target2 |> arrange(id_site)
+
+  # test something is returned and it matches between the query and
+  #   full extract
+  expect_gt(nrow(target1), 0L)
+  expect_gt(nrow(target2), 0L)
+  expect_equal(target1, target2)
+
+  # test fetch_species_info function on a query
+  target1 <- value |> fetch_species_info() |> collect()
+
+  # and on a collected data set
+  target2 <- value |> collect() |> fetch_species_info() |> collect()
+
+  # rearrange to match the two forms
+  target1 <- target1 |> arrange(id_taxon)
+  target2 <- target2 |> arrange(id_taxon)
+
+  # test something is returned and it matches between the query and
+  #   full extract
+  expect_gt(nrow(target1), 0L)
+  expect_gt(nrow(target2), 0L)
+  expect_equal(target1, target2)
+
+  # should also have guild entries for birds
+  expect_contains(colnames(target1), "foraging_guild")
+
+  # but not for fish
+  target3 <- fetch_project(6) |> fetch_species_info() |> collect()
+  expect_false("foraging_guild" %in% colnames(target3))
+
+  # test habitat and weather info can be extracted for birds
+  # test fetch_species_info function on a query
+  target1 <- value |> fetch_habitat_info() |> collect()
+
+  # and on a collected data set
+  target2 <- value |> collect() |> fetch_habitat_info() |> collect()
+
+  # rearrange to match the two forms
+  target1 <- target1 |> arrange(id_surveyevent)
+  target2 <- target2 |> arrange(id_surveyevent)
+
+  # test something is returned and it matches between the query and
+  #   full extract
+  expect_gt(nrow(target1), 0L)
+  expect_gt(nrow(target2), 0L)
+  expect_equal(target1, target2)
+
+})

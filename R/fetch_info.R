@@ -146,10 +146,12 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
         dplyr::select(dplyr::all_of(available_targets[i])) |>
         unlist() |>
         unique()
-      site_info <- site_info |>
-        dplyr::filter(
-          !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
-        )
+      if (!all(is.na(unique_xval))) {
+        site_info <- site_info |>
+          dplyr::filter(
+            !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
+          )
+      }
     }
 
   }
@@ -334,7 +336,7 @@ fetch_species_info <- function(
   if (!x_ok)
     stop("x must be an unevaluated query or tbl/data.frame", call. = FALSE)
 
-  # grab the full list of all taxon information
+  # grab the full list of all taxon information (different schema for birds)
   taxon_lu <- fetch_table("taxon_lu")
 
   # filter based on columns of x if provided
@@ -402,6 +404,19 @@ fetch_species_info <- function(
 
   }
 
+  # add extra guild information for bird data sets
+  discipline <- taxon_lu |>
+    distinct(primary_discipline) |>
+    collect() |>
+    pull(primary_discipline)
+  if ("Terrestrial fauna" %in% discipline) {
+    taxon_lu <- taxon_lu |>
+      dplyr::left_join(
+        fetch_table("taxon_parameters", "birds"),
+        by = "id_taxon"
+      )
+  }
+
   # collect data if required
   if (collect)
     taxon_lu <- taxon_lu |> collect()
@@ -412,5 +427,147 @@ fetch_species_info <- function(
 
   # return
   taxon_lu
+
+}
+
+#' @rdname fetch_info
+#'
+#' @export
+#'
+fetch_habitat_info <- function(
+    x = NULL,
+    ...,
+    collect = FALSE
+) {
+
+  # check x is OK for use
+  x_ok <- is.null(x) |
+    inherits(x, "tbl_PqConnection") |
+    inherits(x, "data.frame")
+  if (!x_ok)
+    stop("x must be an unevaluated query or tbl/data.frame", call. = FALSE)
+
+  # grab the full list of habitat and weather information
+  habitat <- fetch_table("habitat", "birds")
+  weather <- fetch_table("weather", "birds")
+
+  # widen the habitat table, casting to numeric where required
+  numeric_cols <- fetch_table("habitat_param_lu", "birds") |>
+    dplyr::filter(data_type == "numeric") |>
+    collect() |>
+    dplyr::pull(parameter)
+  habitat <- habitat |>
+    tidyr::pivot_wider(
+      id_cols = id_surveyevent,
+      values_from = parameter_value,
+      names_from = habitat_parameter
+    ) |>
+    dplyr::mutate(
+      dplyr::across(all_of(numeric_cols), as.numeric)
+    )
+
+  # combine habitat and weather, and add Icon Site
+  habitat <- habitat |>
+    dplyr::full_join(
+      weather |> select(-gauge_height_m),
+      by = dplyr::join_by(id_surveyevent)
+    ) |>
+    dplyr::left_join(
+      fetch_table("survey_event", "birds") |>
+        dplyr::select(id_survey, id_surveyevent),
+      by = dplyr::join_by(id_surveyevent)
+    ) |>
+    dplyr::left_join(
+      fetch_table("survey", "birds") |>
+        dplyr::select(id_survey, id_site),
+      by = dplyr::join_by(id_survey)
+    ) |>
+    dplyr::left_join(
+      fetch_table("site_system") |>
+        dplyr::select(id_site, system),
+      by = dplyr::join_by(id_site)
+    )
+
+  # filter based on columns of x if provided
+  if (!is.null(x)) {
+
+    # grab names of all fields in x
+    xcol <- colnames(x)
+
+    # pull out main columns of x and collect if it's an unevaluated query
+    target_cols <- c("id_surveyevent", "id_survey", "id_site")
+    available_targets <- xcol[xcol %in% target_cols]
+    xval <- x |> dplyr::select(dplyr::all_of(available_targets))
+    if (inherits(x, "tbl_PqConnection"))
+      xval <- xval |> collect()
+
+    # and filter on these one at a time
+    for (i in seq_along(available_targets)) {
+      unique_xval <- xval |>
+        dplyr::select(dplyr::all_of(available_targets[i])) |>
+        unlist() |>
+        unique()
+      habitat <- habitat |>
+        dplyr::filter(
+          !!rlang::parse_expr(available_targets[i]) %in% !!unique_xval
+        )
+    }
+
+  }
+
+  # filters fields based on regex if provided
+  if (methods::hasArg("pattern")) {
+
+    # set defaults for grepl function and update with arg_list values
+    arg_list <- list(...)
+    args <- list(
+      pattern = arg_list$pattern,
+      ignore.case = FALSE,
+      perl = FALSE,
+      fixed = FALSE,
+      useBytes = FALSE
+    )
+    args[names(arg_list)] <- arg_list
+
+    # filter all string columns based on these settings
+    string_cols <- c(
+      "system"
+    )
+    for (i in seq_along(string_cols)) {
+      habitat <- habitat |>
+        dplyr::filter(
+          grepl(
+            x = !!rlang::parse_expr(string_cols[i]),
+            pattern = !!args$pattern,
+            ignore.case = !!args$ignore.case,
+            perl = !!args$perl,
+            fixed = !!args$fixed,
+            useBytes = !!args$useBytes
+          )
+        )
+    }
+
+  }
+
+  # cast all int64 to int
+  habitat <- habitat |>
+    dplyr::mutate(
+      id_surveyevent = as.integer(id_surveyevent),
+      id_survey = as.integer(id_survey),
+      id_site = as.integer(id_site)
+    ) |>
+    dplyr::select(
+      -id_weather,
+      -uid_orig
+    ) |>
+    dplyr::relocate(system, .before = everything())
+
+
+  # collect data if required
+  if (collect)
+    habitat <- habitat |> collect()
+
+  # return
+  habitat
 
 }

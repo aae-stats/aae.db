@@ -21,7 +21,7 @@ fetch_cpue(
   ...
 )
 
-fetch_birds(collect = FALSE, ...)
+fetch_birds(icon_site = NULL, type = NULL, collect = FALSE, ...)
 }
 \arguments{
 \item{x}{a character specifying an individual table in the AAEDB}
@@ -48,6 +48,13 @@ to see a list of all current systems}
 \item{criterion}{\code{list} containing `var`, `lower`, and `upper` elements
 specifying bounds on `var`. Allows complex filtering such as restricting
 CPUE estimates to a specific length or weight range}
+
+\item{icon_site}{the TLM Icon Site for which data are required. Applicable
+only to TLM bird data sets queried with \code{fetch_birds}}
+
+\item{type}{the TLM bird survey type. One of \code{woodland birds} or
+\code{waterbirds}. Applicable only to TLM bird data sets queried with
+\code{fetch_birds}}
 }
 \description{
 \code{fetch_table} and \code{fetch_project}
@@ -55,6 +62,13 @@ CPUE estimates to a specific length or weight range}
   \code{fetch_table} provides access to prepared tables in
   the database and \code{fetch_project} selects data for an
   individual AAE project.
+
+  \code{fetch_cpue} and \code{fetch_birds} are wrappers to calculate full
+  CPUE data sets for fish or full count data sets for birds, respectively.
+  These functions create full survey tables, which accounts for zero
+  catch/count records in surveyed sites where a particular species was
+  not recorded. These records are excluded from queries to
+  \code{fetch_project}.
 
   All functions require credentials to access the AAEDB, as well
   as a appropriate VPN connection. If making multiple queries,
@@ -112,6 +126,17 @@ ovens_data <- fetch_project(9)
 ovens_data <- ovens_data |>
   filter(survey_year \%in\% c(2015:2017)) |>
   collect()
+
+# download TLM bird data for the Barmah Icon Site woodland birds
+birds <- fetch_birds(
+  icon_site = "Barmah System",
+  type = "woodland birds"
+) |>
+  collect()
+
+# and download species or habitat info associated with these surveys
+species_info <- birds |> fetch_species_info()
+habitat <- birds |> fetch_habitat_info()
 
 # optional: disconnect from the AAEDB prior to ending the R session
 #   when all queries and evaluation is complete

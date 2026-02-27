@@ -24,6 +24,11 @@
 #'    are specified for only a subset of waterbodies; will return an empty
 #'    table if a reporting system is not specified. Use \code{list_systems}
 #'    to see a list of all current systems
+#' @param icon_site the TLM Icon Site for which data are required. Applicable
+#'    only to TLM bird data sets queried with \code{fetch_birds}
+#' @param type the TLM bird survey type. One of \code{woodland birds} or
+#'    \code{waterbirds}. Applicable only to TLM bird data sets queried with
+#'    \code{fetch_birds}
 #' @param collect logical: should a query be executed (\code{TRUE}) or
 #'   evaluated lazily (\code{FALSE}, the default)
 #' @param criterion \code{list} containing `var`, `lower`, and `upper` elements
@@ -36,6 +41,13 @@
 #'   \code{fetch_table} provides access to prepared tables in
 #'   the database and \code{fetch_project} selects data for an
 #'   individual AAE project.
+#'
+#'   \code{fetch_cpue} and \code{fetch_birds} are wrappers to calculate full
+#'   CPUE data sets for fish or full count data sets for birds, respectively.
+#'   These functions create full survey tables, which accounts for zero
+#'   catch/count records in surveyed sites where a particular species was
+#'   not recorded. These records are excluded from queries to
+#'   \code{fetch_project}.
 #'
 #'   All functions require credentials to access the AAEDB, as well
 #'   as a appropriate VPN connection. If making multiple queries,
@@ -93,6 +105,17 @@
 #' ovens_data <- ovens_data |>
 #'   filter(survey_year %in% c(2015:2017)) |>
 #'   collect()
+#'
+#' # download TLM bird data for the Barmah Icon Site woodland birds
+#' birds <- fetch_birds(
+#'   icon_site = "Barmah System",
+#'   type = "woodland birds"
+#' ) |>
+#'   collect()
+#'
+#' # and download species or habitat info associated with these surveys
+#' species_info <- birds |> fetch_species_info()
+#' habitat <- birds |> fetch_habitat_info()
 #'
 #' # optional: disconnect from the AAEDB prior to ending the R session
 #' #   when all queries and evaluation is complete
@@ -484,7 +507,7 @@ fetch_cpue <- function(
 #'
 #' @export
 #'
-fetch_birds <- function(collect = FALSE, ...) {
+fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
 
   # connect to database if required
   new_connection <- connect_if_required("fetch_project", collect = collect)
@@ -494,10 +517,20 @@ fetch_birds <- function(collect = FALSE, ...) {
     on.exit(aaedb_disconnect())
 
   # grab survey event table
-  survey_event <- fetch_survey_event(21, schema = "birds", ...)
+  survey_event <- fetch_table("survey_event", schema = "birds", ...)
+
+  # pull out relevant fields
+  survey_event <- survey_event |>
+    dplyr::select(
+      id_surveyevent,
+      id_survey,
+      time_start,
+      time_finish,
+      condition
+    )
 
   # grab info on collected and observed taxa
-  taxon_lu <- fetch_taxon_lu(...)
+  taxon_lu <- aae.db:::fetch_taxon_lu(...)
   taxa_observed <- fetch_table("observation", "birds", ...)
 
   # combine everything into a single table and keep all gears
@@ -507,59 +540,157 @@ fetch_birds <- function(collect = FALSE, ...) {
       by = "id_surveyevent"
     ) |>
     dplyr::left_join(taxon_lu, by = "id_taxon") |>
-    dplyr::filter(condition == !!"SURVEYABLE")
+    select(
+      id_surveyevent,
+      id_survey,
+      time_start,
+      time_finish,
+      condition,
+      id_observation,
+      id_taxon,
+      scientific_name,
+      common_name,
+      count,
+      count_qualifier,
+      count_accuracy,
+      age_class,
+      breeding,
+      micro_habitat,
+      activity,
+      sex,
+      notes
+    )
 
   # create a full survey x species table, which will allow us to fill
   #   unrecorded species with zero valuesc
   survey_table <- fetch_table("survey", "birds", ...)
 
-  # expand survey table
+  # add some useful info
   survey_table <- survey_table |>
-    dplyr::filter(released) |>
-    dplyr::distinct(id_survey) |>
-    dplyr::full_join(
-      survey_event |>
-        dplyr::distinct(id_survey, id_surveyevent, scientific_name),
-      by = "id_survey"
+    dplyr::left_join(
+      fetch_table("survey_type_lu", "birds", ...) |>
+        dplyr::select(survey_type_id, type_desc),
+      by = "survey_type_id"
     ) |>
-    dplyr::ungroup() |>
-    tidyr::complete(
-      tidyr::nesting(
-        id_site, id_survey, survey_method, id_surveyevent
-      ),
-      scientific_name
+    dplyr::left_join(
+      fetch_table("site", ...) |>
+        dplyr::select(id_site, waterbody, site_name, site_desc),
+      by = "id_site"
+    ) |>
+    dplyr::left_join(
+      fetch_table("site_system", ...),
+      by = "id_site"
     )
 
-  # connect count data to survey table and calculate total counts
-  counts <- survey_table |>
+  # filter to target system and survey type
+  if (!is.null(icon_site)) {
+    sys_list <- survey_table |>
+      dplyr::distinct(system) |>
+      collect() |>
+      dplyr::pull(system)
+    if (!all(icon_site %in% sys_list)) {
+      stop(
+        paste0(
+          "icon_site must be one of `",
+          paste(sys_list[-length(sys_list)], collapse = "`, `"),
+          "`, or `",
+          sys_list[length(sys_list)],
+          "`"
+        ),
+        call. = FALSE
+      )
+    }
+    survey_table <- survey_table |>
+      dplyr::filter(system %in% !!icon_site)
+  }
+  if (!is.null(type)) {
+    if (!all(type %in% c("waterbirds", "woodland birds"))) {
+      stop(
+        "type must be one of `waterbirds` or `woodland birds`",
+        call. = FALSE
+      )
+    }
+    survey_table <- survey_table |>
+      dplyr::filter(type_desc %in% !!type)
+  }
+
+  # expand survey table
+  survey_table_expanded <- survey_table |>
+    dplyr::filter(released) |>
+    dplyr::distinct(id_survey, system, type_desc) |>
     dplyr::left_join(
-      survey_event,
-      by = c("id_site", "id_survey", "survey_method")
+      survey_event |>
+        dplyr::distinct(
+          id_survey, id_surveyevent, scientific_name, condition
+        ),
+      by = "id_survey"
     ) |>
-    dplyr::left_join(
-      catch |> dplyr::select(id_survey, scientific_name, catch),
-      by = c("id_survey", "scientific_name")
-    ) |>
+    dplyr::filter(condition == "SURVEYABLE") |>
     dplyr::mutate(
-      catch = ifelse(is.na(catch), 0, catch),
-      effort_h = effort_s / 3600,
-      cpue = catch / effort_h
+      scientific_name = ifelse(
+        is.na(scientific_name),
+        "No birds",
+        scientific_name
+      )
+    ) |>
+    dplyr::group_by(system, type_desc) |>
+    tidyr::complete(
+      tidyr::nesting(id_survey, id_surveyevent, condition),
+      tidyr::nesting(scientific_name)
+    ) |>
+    dplyr::ungroup()
+
+  # add counts, fill NA with zero
+  counts <- survey_table_expanded |>
+    dplyr::left_join(
+      survey_event |>
+        dplyr::select(-condition, -id_observation, -id_taxon),
+      by = c("id_survey", "id_surveyevent", "scientific_name")
+    ) |>
+    dplyr::left_join(
+      survey_table |>
+        dplyr::select(
+          id_survey,
+          id_site,
+          sdate,
+          sdate_accuracy,
+          survey_method,
+          regime,
+          site_coverage_perc,
+          waterbody,
+          site_name,
+          site_desc
+        ),
+      by = "id_survey"
+    )
+
+  # convert int64 to interger
+  counts <- counts |>
+    dplyr::mutate(
+      count = as.integer(count),
+      id_site = as.integer(id_site),
+      id_survey = as.integer(id_survey),
+      id_surveyevent = as.integer(id_surveyevent)
     )
 
   # tidy this output and add a time stamp
-  cpue <- cpue |>
+  counts <- counts |>
+    dplyr::rename(
+      survey_date = sdate,
+      survey_date_accuracy = sdate_accuracy
+    ) |>
     dplyr::mutate(
       extracted_ts = dplyr::sql("timezone('Australia/Melbourne'::text, now())")
     ) |>
-    dplyr::select(dplyr::all_of(cpue_return_cols)) |>
-    dplyr::filter(!is.na(scientific_name))
+    dplyr::select(dplyr::all_of(count_return_cols)) |>
+    dplyr::filter(scientific_name != "No birds")
 
   # collect data if required
   if (collect)
-    cpue <- cpue |> collect()
+    counts <- counts |> collect()
 
   # and return
-  cpue
+  counts
 
 }
 
@@ -615,5 +746,36 @@ cpue_return_cols <- c(
   "scientific_name",
   "catch",
   "cpue",
+  "extracted_ts"
+)
+
+# internal list of variables to be returned from database for count records
+count_return_cols <- c(
+  "system",
+  "waterbody",
+  "site_name",
+  "site_desc",
+  "regime",
+  "survey_date",
+  "survey_date_accuracy",
+  "time_start",
+  "time_finish",
+  "type_desc",
+  "survey_method",
+  "scientific_name",
+  "common_name",
+  "count",
+  "count_qualifier",
+  "count_accuracy",
+  "age_class",
+  "breeding",
+  "micro_habitat",
+  "activity",
+  "site_coverage_perc",
+  "sex",
+  "notes",
+  "id_site",
+  "id_survey",
+  "id_surveyevent",
   "extracted_ts"
 )
