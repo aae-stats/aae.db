@@ -7,7 +7,7 @@
 #'
 #' @importFrom dplyr all_of distinct filter full_join group_by
 #'   inner_join left_join mutate rename select summarise tbl
-#'   ungroup union_all pull
+#'   ungroup union_all pull join_by
 #' @importFrom dbplyr in_schema sql
 #' @importFrom tidyr complete nesting
 #' @importFrom rlang `!!` sym
@@ -89,7 +89,7 @@
 #' survey_info_dplyr <- site_data |>
 #'   left_join(
 #'     survey_data |> distinct(id_site, id_project),
-#'     by = "id_site"
+#'     by = join_by(id_site)
 #'   ) |>
 #'   filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
 #'   distinct(waterbody, id_project) |>
@@ -244,7 +244,7 @@ fetch_project <- function(
         collected,
         observed
       ),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     ) |>
     dplyr::filter(
       seconds > 0 | soak_minutes_per_unit > 0 | gear_count > 0
@@ -359,7 +359,7 @@ fetch_cpue <- function(
         collected,
         observed
       ),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     ) |>
     dplyr::select(-time_start, -time_finish, -condition)
 
@@ -422,7 +422,7 @@ fetch_cpue <- function(
     dplyr::distinct(id_survey) |>
     dplyr::left_join(
       catch |> dplyr::distinct(id_survey, scientific_name),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     ) |>
     tidyr::complete(
       id_survey,
@@ -439,7 +439,7 @@ fetch_cpue <- function(
           regime,
           seconds, soak_minutes, gear_count
         ),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     ) |>
     dplyr::rename(survey_date = sdate)
 
@@ -459,13 +459,13 @@ fetch_cpue <- function(
           survey_year,
           gear_type
         ),
-      by = c(
-        "id_project",
-        "id_site",
-        "id_survey",
-        "gear_type",
-        "survey_date",
-        "regime"
+      by = dplyr::join_by(
+        id_project,
+        id_site,
+        id_survey,
+        gear_type,
+        survey_date,
+        regime
       )
     ) |>
     dplyr::rename(
@@ -475,7 +475,7 @@ fetch_cpue <- function(
     ) |>
     dplyr::left_join(
       catch |> dplyr::select(id_survey, scientific_name, catch),
-      by = c("id_survey", "scientific_name")
+      by = dplyr::join_by(id_survey, scientific_name)
     ) |>
     dplyr::mutate(
       catch = ifelse(is.na(catch), 0, catch),
@@ -537,9 +537,9 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
   survey_event <- survey_event |>
     dplyr::left_join(
       taxa_observed,
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     ) |>
-    dplyr::left_join(taxon_lu, by = "id_taxon") |>
+    dplyr::left_join(taxon_lu, by = dplyr::join_by(id_taxon)) |>
     select(
       id_surveyevent,
       id_survey,
@@ -570,16 +570,16 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
     dplyr::left_join(
       fetch_table("survey_type_lu", "birds", ...) |>
         dplyr::select(survey_type_id, type_desc),
-      by = "survey_type_id"
+      by = dplyr::join_by(survey_type_id)
     ) |>
     dplyr::left_join(
       fetch_table("site", ...) |>
         dplyr::select(id_site, waterbody, site_name, site_desc),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     ) |>
     dplyr::left_join(
       fetch_table("site_system", ...),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     )
 
   # filter to target system and survey type
@@ -621,9 +621,9 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
     dplyr::left_join(
       survey_event |>
         dplyr::distinct(
-          id_survey, id_surveyevent, scientific_name, condition
+          id_survey, id_surveyevent, scientific_name, common_name, condition
         ),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     ) |>
     dplyr::filter(condition == "SURVEYABLE") |>
     dplyr::mutate(
@@ -636,7 +636,7 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
     dplyr::group_by(system, type_desc) |>
     tidyr::complete(
       tidyr::nesting(id_survey, id_surveyevent, condition),
-      tidyr::nesting(scientific_name)
+      tidyr::nesting(scientific_name, common_name)
     ) |>
     dplyr::ungroup()
 
@@ -644,8 +644,8 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
   counts <- survey_table_expanded |>
     dplyr::left_join(
       survey_event |>
-        dplyr::select(-condition, -id_observation, -id_taxon),
-      by = c("id_survey", "id_surveyevent", "scientific_name")
+        dplyr::select(-condition, -id_observation, -id_taxon, -common_name),
+      by = dplyr::join_by(id_survey, id_surveyevent, scientific_name)
     ) |>
     dplyr::left_join(
       survey_table |>
@@ -661,7 +661,7 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
           site_name,
           site_desc
         ),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     )
 
   # convert int64 to interger

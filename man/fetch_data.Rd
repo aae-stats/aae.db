@@ -110,7 +110,7 @@ survey_data <- fetch_table("survey")
 survey_info_dplyr <- site_data |>
   left_join(
     survey_data |> distinct(id_site, id_project),
-    by = "id_site"
+    by = join_by(id_site)
   ) |>
   filter(grepl("ovens", waterbody, ignore.case = TRUE)) |>
   distinct(waterbody, id_project) |>

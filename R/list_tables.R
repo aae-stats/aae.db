@@ -108,7 +108,7 @@ list_systems <- function(..., collect = FALSE) {
   table <- fetch_table("site_system", ...) |>
     left_join(
       fetch_table("site") |> select(id_site, waterbody),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     ) |>
     distinct(system, waterbody) |>
     arrange(system, waterbody)

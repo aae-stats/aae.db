@@ -1,6 +1,6 @@
 # collection of functions that support the `fetch_` methods
 #' @importFrom dplyr all_of filter group_by inner_join left_join
-#'   mutate rename select summarise
+#'   mutate rename select summarise join_by
 #' @importFrom rlang `!!`
 
 # internal function to fetch survey event info
@@ -14,7 +14,7 @@ fetch_survey_event <- function(project_id, ...) {
         dplyr::select(
           id_site, id_survey, id_project, sdate, gear_type, released, regime
         ),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     ) |>
     dplyr::mutate(syear = year(sdate)) |>
     dplyr::rename(
@@ -26,12 +26,12 @@ fetch_survey_event <- function(project_id, ...) {
         dplyr::select(
           id_survey, id_surveyevent, time_start, time_finish, condition
         ),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     ) |>
     dplyr::left_join(
       fetch_table("site_project_lu", ...) |>
         dplyr::select(id_site, id_project, site_name),
-      by = c("id_site", "id_project")
+      by = dplyr::join_by(id_site, id_project)
     ) |>
     dplyr::filter(
       id_project %in% project_id,
@@ -53,7 +53,7 @@ add_electro <- function(x, ...) {
     dplyr::left_join(
       fetch_table("electro", ...) |>
         dplyr::select(id_surveyevent, seconds),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     )
 }
 
@@ -65,7 +65,7 @@ add_netting <- function(x, ...) {
         dplyr::select(
           id_surveyevent, id_netting, soak_minutes_per_unit, gear_count
         ),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     )
 }
 
@@ -100,9 +100,9 @@ fetch_collected <- function(survey_event, taxon_lu, ...) {
     ) |>
     dplyr::inner_join(
       survey_event |> dplyr::select(id_surveyevent),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     ) |>
-    dplyr::inner_join(taxon_lu, by = "id_taxon")
+    dplyr::inner_join(taxon_lu, by = dplyr::join_by(id_taxon))
 
 }
 
@@ -125,9 +125,9 @@ fetch_observed <- function(survey_event, taxon_lu, taxa_collected, ...) {
     ) |>
     dplyr::left_join(
       survey_event |> dplyr::select(id_surveyevent),
-      by = "id_surveyevent"
+      by = dplyr::join_by(id_surveyevent)
     ) |>
-    dplyr::inner_join(taxon_lu, by = "id_taxon") |>
+    dplyr::inner_join(taxon_lu, by = dplyr::join_by(id_taxon)) |>
     dplyr::select(dplyr::all_of(colnames(taxa_collected)))
 
 }
@@ -144,12 +144,12 @@ fetch_survey_table <- function(project_id, ...) {
         dplyr::select(
           id_site, id_survey, id_project, gear_type, sdate, released, regime
         ),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     ) |>
     dplyr::left_join(
       fetch_table("survey_event", ...) |>
         dplyr::select(id_survey, id_surveyevent, condition),
-      by = "id_survey"
+      by = dplyr::join_by(id_survey)
     )
 
   # add electro information (seconds power on) and netting info (gear_count)

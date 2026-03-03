@@ -6,7 +6,7 @@
 #'
 #' @importFrom methods hasArg
 #' @importFrom dplyr across all_of arrange filter if_any left_join mutate
-#'   select
+#'   select join_by
 #' @importFrom rlang `!!` parse_expr
 #'
 #' @param x an evaluated or unevaluated query (table) for which to extract
@@ -116,12 +116,12 @@ fetch_site_info <- function(x = NULL, ..., collect = FALSE) {
     dplyr::left_join(
       fetch_table("site_project_lu") |>
         dplyr::select(id_site, site_name, id_project),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     ) |>
     dplyr::left_join(
       fetch_table("v_project_reach_zones_site_id", "projects") |>
         select(id_site, reach_id, sub_reach_id, cma),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     )
 
   # filter based on columns of x if provided
@@ -228,10 +228,10 @@ fetch_survey_info <- function(x = NULL, ..., collect = FALSE) {
     dplyr::left_join(
       fetch_table("v_project_reach_zones_site_id", "projects") |>
         select(id_site, reach_id, sub_reach_id, cma),
-      by = "id_site"
+      by = dplyr::join_by(id_site)
     )
   survey_info <- fetch_survey_table(seq_len(20)) |>
-    dplyr::left_join(site_info, by = "id_site")
+    dplyr::left_join(site_info, by = dplyr::join_by(id_site))
 
   # filter based on columns of x if provided
   if (!is.null(x)) {
@@ -413,7 +413,7 @@ fetch_species_info <- function(
     taxon_lu <- taxon_lu |>
       dplyr::left_join(
         fetch_table("taxon_parameters", "birds"),
-        by = "id_taxon"
+        by = dplyr::join_by(id_taxon)
       )
   }
 
@@ -469,7 +469,7 @@ fetch_habitat_info <- function(
   # combine habitat and weather, and add Icon Site
   habitat <- habitat |>
     dplyr::full_join(
-      weather |> select(-gauge_height_m),
+      weather,
       by = dplyr::join_by(id_surveyevent)
     ) |>
     dplyr::left_join(
