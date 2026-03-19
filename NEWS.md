@@ -3,6 +3,12 @@
 
 # aae.db 0.1.0.9007
 
+## Features
+
+- Update birds microhabitat field with informative classifications
+- Use `incidental_only` field to birds `survey_event` table to
+    identify events without structured surveys
+
 ## Fixes
 
 - Remove `fetch_query` option for direct SQL queries

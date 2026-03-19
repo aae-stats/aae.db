@@ -531,7 +531,13 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
 
   # grab info on collected and observed taxa
   taxon_lu <- aae.db:::fetch_taxon_lu(...)
-  taxa_observed <- fetch_table("observation", "birds", ...)
+  taxa_observed <- fetch_table("observation", "birds", ...) |>
+    dplyr::left_join(
+      fetch_table("microhabitat", "birds"),
+      by = "id_observation"
+    ) |>
+    dplyr::rename(microhabitat = microhabitat_type)
+
 
   # combine everything into a single table and keep all gears
   survey_event <- survey_event |>
@@ -555,8 +561,8 @@ fetch_birds <- function(icon_site = NULL, type = NULL, collect = FALSE, ...) {
       count_accuracy,
       age_class,
       breeding,
-      micro_habitat,
       activity,
+      microhabitat,
       sex,
       notes
     )
@@ -769,8 +775,8 @@ count_return_cols <- c(
   "count_accuracy",
   "age_class",
   "breeding",
-  "micro_habitat",
   "activity",
+  "microhabitat",
   "site_coverage_perc",
   "sex",
   "notes",
